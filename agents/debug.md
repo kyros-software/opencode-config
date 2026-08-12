@@ -1,5 +1,5 @@
 ---
-description: Algo falla AHORA — excepción, stack trace, comportamiento roto. Del síntoma a la causa raíz, y lo arregla. No: código sano (reviewer), escribir tests (test).
+description: USA ESTO CUANDO algo falla AHORA — hay una excepción, un stack trace, un test en rojo o algo que antes iba y ya no. Del síntoma a la causa raíz, y lo arregla. No: código sano que solo hay que opinar (reviewer), escribir tests nuevos (test), reestructurar lo que funciona (refactor).
 mode: subagent
 model: opencode-go/kimi-k2.7-code
 temperature: 0

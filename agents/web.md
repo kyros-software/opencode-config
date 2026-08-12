@@ -1,5 +1,5 @@
 ---
-description: Navegación y extracción pesada en el navegador compartido — recorrer páginas, scrapear listados, verificar una UI, leer consola y red. Devuelve datos destilados, no árboles DOM. No: muros que requieren humano (captcha, 2FA, checkpoint) — esos van en el contexto principal.
+description: USA ESTO CUANDO haya que operar el navegador — verificar que una UI funciona, recorrer páginas, extraer datos de una web, leer la consola o la red de una página en marcha. Devuelve datos destilados, no árboles DOM. No: muros que necesitan a un humano (captcha, 2FA, checkpoint) — esos se reportan y para.
 mode: subagent
 model: opencode-go/glm-5.1
 temperature: 0

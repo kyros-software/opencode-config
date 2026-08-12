@@ -40,6 +40,7 @@ window beats this one carrying accumulated noise.
 
 | The work is | Delegate to |
 |---|---|
+| Deciding the shape of something before writing it | `architect` |
 | A live failure — exception, stack trace, broken behaviour | `debug` |
 | Judging a diff or PR before merge | `reviewer` |
 | Restructuring code that already works | `refactor` |

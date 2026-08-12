@@ -26,8 +26,8 @@ After installing, run `opencode auth login`.
 |---|---|
 | `opencode.json` | Main config: models, compaction, tool output caps, watcher ignores, provider timeouts |
 | `AGENTS.md` | Global rules, loaded into every request. **Keep byte-stable** — see below |
-| `agents/` | 9 subagents, each pinned to a model chosen for its job |
-| `skills/` | 7 on-demand skills |
+| `agents/` | 13 subagents (plus build/plan/explore in the config), each pinned to a model chosen for its job |
+| `skills/` | 9 on-demand skills |
 | `plugins/` | `tandem.ts` (browser control), `fallback-proxy.ts` |
 | `test/` | Test suite for the fallback proxy (`bun test`) |
 
@@ -56,6 +56,8 @@ Every agent pins its own model, so one dead model breaks one agent, not the flee
 | Agent | Model | Temp |
 |---|---|---|
 | build (primary) | `deepseek-v4-pro` | 0 |
+| architect | `kimi-k3` | 0.2 |
+| design | `qwen3.8-max` | **0.8** |
 | plan | `kimi-k3` | 0.1 |
 | explore | `glm-5.1` | 0 |
 | test | `deepseek-v4-pro` | 0 |
@@ -90,6 +92,37 @@ MCP earns its cost only for things with no CLI equivalent. If you add one:
 ```json
 "permission": { "mcp_*": "ask" }
 ```
+
+## Two traps that cost hours to find
+
+Both make a non-interactive run hang until it times out, with no error and no
+session in the database. Neither is documented upstream.
+
+**1. `permission` in a project `opencode.json` replaces, it does not merge.**
+
+```jsonc
+// This hangs. 'edit' and 'bash' silently revert to "ask", and in a
+// non-interactive run there is nobody to answer.
+{ "agent": { "build": { "permission": { "skill": "deny" } } } }
+```
+
+If you set `permission` on an agent at project level, **enumerate every tool you
+need**, including the ones the global config already allowed.
+
+**2. `--print-logs` with stdout redirected to a file hangs.**
+
+```bash
+opencode run --print-logs "..." > out.log 2>&1   # hangs
+opencode run "..." 2>&1 | tail -40 > out.log     # fine
+```
+
+Pipe it; do not redirect it. Get the session id from the database instead:
+`select id from session order by time_created desc limit 1`.
+
+**Bonus, for measuring:** `sessionID` is a *column* (`session_id`) on `message`,
+not a field inside its JSON. And prompt size is `tokens.input + tokens.cache.read`
+— reading `input` alone compares runs with different cache states and gives
+nonsense.
 
 ## Maintenance
 

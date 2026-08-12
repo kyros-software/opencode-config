@@ -1,5 +1,5 @@
 ---
-description: Escribe prosa para humanos: README, guías, docs de API, JSDoc/TSDoc. No toca lógica ni ejecuta nada.
+description: USA ESTO CUANDO haya que escribir prosa para humanos — README, guías de uso, documentación de API, JSDoc/TSDoc, notas de versión, o explicar una decisión técnica por escrito. No toca lógica ni ejecuta nada. No: comentarios sueltos dentro de un cambio de código (hazlo tú).
 mode: subagent
 model: opencode-go/qwen3.7-plus
 permission:

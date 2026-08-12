@@ -1,5 +1,5 @@
 ---
-description: Escribe o ejecuta tests con el framework del proyecto — unitarios, integración, E2E. No: diagnosticar un fallo en marcha (debug).
+description: USA ESTO CUANDO haya que escribir o ejecutar tests — unitarios, integración, E2E — o cuando el usuario pida cobertura, "añade tests", "comprueba que esto funciona". Usa el framework que ya tenga el proyecto. No: diagnosticar un fallo en marcha (debug), verificar en navegador (web).
 mode: subagent
 model: opencode-go/deepseek-v4-pro
 temperature: 0

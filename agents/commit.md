@@ -1,5 +1,5 @@
 ---
-description: Convierte un diff en un mensaje de commit y lo commitea. Conventional commits. Solo git, no escribe código.
+description: USA ESTO CUANDO haya que convertir cambios en commits — redactar el mensaje siguiendo conventional commits, agrupar cambios lógicos, o cuando el usuario diga "commitea esto", "haz el commit". Solo git, no escribe código. No: hacer push ni abrir PRs sin que se pida.
 mode: subagent
 model: opencode-go/glm-5.1
 temperature: 0

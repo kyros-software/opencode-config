@@ -1,5 +1,5 @@
 ---
-description: Caza vulnerabilidades: inyección, XSS/CSRF/SSRF, secrets expuestos, authn/authz, deps vulnerables, config insegura. Solo lee. No: calidad general del código (reviewer).
+description: USA ESTO CUANDO haya que auditar seguridad — inyección SQL, XSS, CSRF, SSRF, secrets expuestos, autenticación y autorización, dependencias vulnerables, configuración insegura. También al tocar login, pagos, subida de ficheros o endpoints públicos. Solo lee. No: calidad general del código (reviewer).
 mode: subagent
 model: opencode-go/kimi-k3
 temperature: 0

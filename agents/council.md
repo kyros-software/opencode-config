@@ -1,5 +1,5 @@
 ---
-description: Consejero de propósito general para paneles multi-perspectiva (llm-council y similares). Adopta la lente de pensamiento que se le asigne y responde desde ella sin hedging. Solo lee y razona, no toca código. No: tareas con especialista propio (debug, reviewer, security, test).
+description: USA ESTO CUANDO haya que presionar una decisión desde varios ángulos — te asignan una lente concreta (riesgo, primeros principios, oportunidad, ejecución) y la defiendes sin equilibrar. Para paneles tipo llm-council. Solo lee y razona. No: tareas con especialista propio (debug, reviewer, security, test).
 mode: subagent
 model: opencode-go/kimi-k3
 temperature: 0.7

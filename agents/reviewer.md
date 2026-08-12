@@ -1,5 +1,5 @@
 ---
-description: Juzga un diff o PR antes de mergear: bugs latentes, rendimiento, mantenibilidad. Señala, no toca. No: errores activos (debug), reestructurar (refactor).
+description: USA ESTO CUANDO haya que juzgar código antes de mergear — un diff, una rama, un PR — buscando bugs latentes, casos borde, rendimiento y mantenibilidad. Señala, no toca. También cuando el usuario diga "revisa esto", "qué te parece", "está listo para mergear". No: arreglar un fallo activo (debug), aplicar los cambios (refactor).
 mode: subagent
 model: opencode-go/kimi-k2.7-code
 temperature: 0
