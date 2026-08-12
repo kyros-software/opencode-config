@@ -4,11 +4,24 @@ mode: subagent
 model: opencode-go/kimi-k3
 temperature: 0.7
 permission:
-  # tandem_* no aparece en el prompt si se deniega: -4559 tokens
+  # tandem_* no aparece en el prompt si se deniega: -1743 tokens (medido)
   "tandem_*": deny
   edit: deny
   bash:
     "*": ask
+    "ls*": allow
+    "find *": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "wc *": allow
+    "tree*": allow
+    "pwd": allow
+    "file *": allow
+    "stat *": allow
+    "git status*": allow
+    "git show*": allow
+    "git ls-files*": allow
     "git log*": allow
     "git diff*": allow
 ---

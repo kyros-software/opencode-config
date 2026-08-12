@@ -8,6 +8,21 @@ permission:
   edit: allow
   bash:
     "*": ask
+    "ls*": allow
+    "find *": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "wc *": allow
+    "tree*": allow
+    "pwd": allow
+    "file *": allow
+    "stat *": allow
+    "git log*": allow
+    "git diff*": allow
+    "git status*": allow
+    "git show*": allow
+    "git ls-files*": allow
 ---
 
 Diseñas interfaces. Tu criterio visual es el producto; el código es cómo lo entregas.

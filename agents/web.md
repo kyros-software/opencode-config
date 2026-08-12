@@ -7,6 +7,21 @@ permission:
   edit: deny
   bash:
     "*": ask
+    "ls*": allow
+    "find *": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "wc *": allow
+    "tree*": allow
+    "pwd": allow
+    "file *": allow
+    "stat *": allow
+    "git log*": allow
+    "git diff*": allow
+    "git status*": allow
+    "git show*": allow
+    "git ls-files*": allow
 ---
 
 Operas el Chrome compartido con las herramientas `tandem_*`. Lee la skill `tandem` antes de empezar si no la tienes presente.

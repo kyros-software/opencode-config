@@ -6,9 +6,21 @@ temperature: 0.2
 permission:
   "tandem_*": deny
   edit: deny
-  write: deny
   bash:
     "*": ask
+    "ls*": allow
+    "find *": allow
+    "cat *": allow
+    "head *": allow
+    "tail *": allow
+    "wc *": allow
+    "tree*": allow
+    "pwd": allow
+    "file *": allow
+    "stat *": allow
+    "git status*": allow
+    "git show*": allow
+    "git ls-files*": allow
     "git log*": allow
     "git diff*": allow
 ---
