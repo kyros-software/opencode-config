@@ -1,6 +1,6 @@
 ---
 name: opencode-verify
-description: Offload E2E browser verify to OpenCode+Tandem (glm-5.1, go tier); digest JSON (/opencode-verify).
+description: Offload E2E browser verification to a headless OpenCode+Tandem run with a cheap model (glm-5.1, go tier) and read back a JSON digest. Use to smoke-test or verify a module after implementing changes, without loading browser noise into the implementing agent's context.
 disable-model-invocation: true
 disabled-environments:
   - cloud
@@ -8,22 +8,25 @@ disabled-environments:
 
 # OpenCode verify
 
-**Cursor implements. OpenCode (+ Tandem) verifies in headless with a cheap model. Cursor only reads the digest.**
+**You implement. A separate headless OpenCode + Tandem run verifies. You read only the digest.**
 
-Does **not** remove Tandem from Cursor — this is the recommended path when Tandem would bloat the implementing agent.
+The point is context isolation: driving a browser generates snapshots, DOM and
+network noise that would bloat whatever agent is doing the actual work. That
+noise stays in the headless run; you get one JSON object back.
 
-Scripts in this skill's `scripts/` (run with `python3`). Product config: workspace `.cursor/opencode-verify.md`.
+Scripts live in this skill's `scripts/` (run with `python3`).
 
 ## Autonomy
 
-- `/opencode-verify`, `/smoke`, “verifica con OpenCode”, “E2E smoke” = run this skill.
-- Do **not** drive Tandem yourself for this ritual unless the digest fails and the user asks you to dig in-Cursor.
-- Do **not** dump raw OpenCode NDJSON into chat — only the script JSON.
+- `/opencode-verify`, `/smoke`, "verifica con OpenCode", "E2E smoke" = run this skill.
+- Do **not** drive Tandem yourself for this ritual unless the digest fails and
+  the user asks you to dig in.
+- Do **not** dump raw OpenCode NDJSON into chat — only the script's JSON.
 
 ## Execute
 
-Let `SCRIPTS` = this skill's `scripts/` directory.  
-Let `CONFIG` = `<workspace>/.cursor/opencode-verify.md` (optional but preferred).
+Let `SCRIPTS` = this skill's `scripts/` directory.
+Let `CONFIG` = the product config markdown, if the project has one (optional).
 
 ### 1. Run
 
@@ -73,15 +76,22 @@ opencode serve --port 4096
 - `summary` (capped text; expects `RESULT:` / `SUMMARY:` / `FAILURES:` block)
 - `tools[]`, `errors[]`, `exit_code`, `next`
 
+## Product config
+
+Optional markdown file passed with `--config`, holding a key/value table:
+`model`, `cwd`, `base_url`, `persona`, `timeout`. Anything not set there falls
+back to the script defaults. Put it wherever the project prefers — the path is
+just an argument, nothing is hardcoded.
+
 ## Anti-goals
 
-- Not a second Cursor / not MCP parity.
-- Not Engram/Slack/Plane inside OpenCode.
+- Not a general-purpose browser agent — for interactive navigation use the
+  `web` subagent or drive `tandem_*` directly (see the `tandem` skill).
 - Not auto-merge or auto-commit from verify results.
 
 ## Setup
 
 1. Copy `skills/opencode-verify/` to the agent runtime skills dir.
 2. OpenCode CLI installed; model `opencode-go/glm-5.1` available (go tier — zen has no balance).
-3. Tandem install for OpenCode: `plugins/tandem/install.sh --opencode`.
-4. Product: `.cursor/opencode-verify.md` (model, cwd, base_url, persona, timeout).
+3. Tandem installed for OpenCode as a plugin (`~/.config/opencode/plugins/tandem.ts`).
+4. Optional product config (see above).

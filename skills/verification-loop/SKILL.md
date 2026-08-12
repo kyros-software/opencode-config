@@ -1,129 +1,86 @@
 ---
 name: verification-loop
-description: "A comprehensive verification system for OpenCode sessions. Use when verifying a OpenCode session's work before claiming it is complete."
+description: Checklist to run before claiming work is complete — build, types, lint, tests, diff review — with the commands discovered from the project rather than assumed. Use after finishing a change, before opening a PR, or whenever about to report something as done.
 license: MIT
 metadata:
-  origin: ECC
+  origin: ECC (rewritten)
 ---
 
-# Verification Loop Skill
+# Verification Loop
 
-A comprehensive verification system for OpenCode sessions.
+"Should work" is not a result. This is the gate between doing the work and
+saying it is done.
 
-## When to Use
+## Step 0 — Find the real commands
 
-Invoke this skill:
-- After completing a feature or significant code change
-- Before creating a PR
-- When you want to ensure quality gates pass
-- After refactoring
+Do not assume npm. Detect, then run what the project actually uses.
 
-## Verification Phases
-
-### Phase 1: Build Verification
 ```bash
-# Check if project builds
-npm run build 2>&1 | tail -20
-# OR
-pnpm build 2>&1 | tail -20
+ls package.json bun.lock pnpm-lock.yaml yarn.lock Cargo.toml go.mod \
+   pyproject.toml Makefile 2>/dev/null
 ```
 
-If build fails, STOP and fix before continuing.
+- `package.json` → read its `scripts` block. That is the source of truth for
+  build/test/lint, whatever the runner underneath is.
+- Lockfile decides the runner: `bun.lock` → bun, `pnpm-lock.yaml` → pnpm,
+  `yarn.lock` → yarn, otherwise npm.
+- `Cargo.toml` → `cargo build` / `cargo test` / `cargo clippy`
+- `go.mod` → `go build ./...` / `go test ./...` / `go vet ./...`
+- `pyproject.toml` → check for pytest, ruff, mypy/pyright in its config
+- `Makefile` → grep its targets before inventing anything
 
-### Phase 2: Type Check
-```bash
-set -o pipefail
-# TypeScript projects
-npx --no-install tsc --noEmit 2>&1 | head -30
+If the project has a CI workflow, read it: `.github/workflows/*.yml` states
+exactly which commands must pass. Match those, not your habits.
 
-# Python projects
-pyright . 2>&1 | head -30
-```
+## The phases
 
-Report all type errors. Fix critical ones before continuing.
+Run in order. A failure at one stage makes later stages meaningless — stop and
+fix rather than collecting a list of downstream noise.
 
-### Phase 3: Lint Check
-```bash
-# JavaScript/TypeScript
-npm run lint 2>&1 | head -30
+1. **Build** — must compile before anything else means anything.
+2. **Types** — `tsc --noEmit`, `mypy`, `pyright`, or whatever the project uses.
+3. **Lint** — only if the project has it configured. Do not introduce a linter
+   as part of a verification run.
+4. **Tests** — run them. Report the real numbers: passed, failed, skipped.
+   Only mention coverage if the project enforces a threshold; inventing an "80%
+   target" the project never set is noise.
+5. **Diff review** — `git diff` (or `git diff --cached`). Read every hunk and
+   look for: changes you did not intend, debug output left behind, error paths
+   that got dropped, a case the change now silently misses.
 
-# Python
-ruff check . 2>&1 | head -30
-```
+Use `set -o pipefail` when piping to `head`/`tail`, or a failure exits 0 and you
+report a pass that never happened.
 
-### Phase 4: Test Suite
-```bash
-# Run tests with coverage
-npm run test -- --coverage 2>&1 | tail -50
-
-# Check coverage threshold
-# Target: 80% minimum
-```
-
-Report:
-- Total tests: X
-- Passed: X
-- Failed: X
-- Coverage: X%
-
-### Phase 5: Security Scan
-```bash
-# Check for secrets
-grep -rn "sk-" --include="*.ts" --include="*.js" . 2>/dev/null | head -10
-grep -rn "api_key" --include="*.ts" --include="*.js" . 2>/dev/null | head -10
-
-# Check for console.log
-grep -rn "console.log" --include="*.ts" --include="*.tsx" src/ 2>/dev/null | head -10
-```
-
-### Phase 6: Diff Review
-```bash
-# Show what changed
-git diff --stat
-git diff HEAD~1 --name-only
-```
-
-Review each changed file for:
-- Unintended changes
-- Missing error handling
-- Potential edge cases
-
-## Output Format
-
-After running all phases, produce a verification report:
+## Report
 
 ```
-VERIFICATION REPORT
-==================
+Build:   PASS | FAIL
+Types:   PASS | FAIL  (N errors)
+Lint:    PASS | FAIL | n/a
+Tests:   PASS | FAIL  (X passed, Y failed, Z skipped)
+Diff:    N files
 
-Build:     [PASS/FAIL]
-Types:     [PASS/FAIL] (X errors)
-Lint:      [PASS/FAIL] (X warnings)
-Tests:     [PASS/FAIL] (X/Y passed, Z% coverage)
-Security:  [PASS/FAIL] (X issues)
-Diff:      [X files changed]
+Verdict: READY | NOT READY
 
-Overall:   [READY/NOT READY] for PR
-
-Issues to Fix:
-1. ...
-2. ...
+Outstanding:
+- ...
 ```
 
-## Continuous Mode
+**Do not fill in a phase you did not run.** `n/a` and "not run" are honest;
+a fabricated PASS is the single worst outcome this skill can produce. If a
+phase could not run — no test script, build needs credentials you lack — say
+that plainly and say why.
 
-For long sessions, run verification every 15 minutes or after major changes:
+## What this is not
 
-```markdown
-Set a mental checkpoint:
-- After completing each function
-- After finishing a component
-- Before moving to next task
+It does not scan for vulnerabilities. Grepping for `sk-` and `api_key` finds
+almost nothing real and gives false confidence — use the `security-review`
+skill or the `security` subagent for that.
 
-Run: /verify
-```
+It is a checklist you run deliberately, not an automated gate, and not
+something to fire on a timer.
 
-## Integration with Hooks
+## Related
 
-Run this before claiming a task complete; it is a checklist, not an automated gate.
-Hooks catch issues immediately; this skill provides comprehensive review.
+- `security-review` — actual security checklist
+- `opencode-verify` — E2E browser verification in a separate headless run

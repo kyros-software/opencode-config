@@ -35,7 +35,7 @@ def main() -> int:
     p.add_argument(
         "--config",
         default="",
-        help="Product config markdown (e.g. .cursor/opencode-verify.md)",
+        help="Product config markdown with model/cwd/base_url/persona/timeout",
     )
     p.add_argument("--cwd", default="", help="Directory for opencode --dir")
     p.add_argument(
