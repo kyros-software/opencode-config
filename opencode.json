@@ -1,0 +1,86 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode-go/deepseek-v4-pro",
+  "small_model": "opencode-go/glm-5.1",
+  "default_agent": "build",
+  "autoupdate": "notify",
+  "snapshot": false,
+  "share": "disabled",
+  "compaction": {
+    "auto": true,
+    "prune": false,
+    "tail_turns": 2,
+    "reserved": 10000
+  },
+  "tool_output": {
+    "max_lines": 500,
+    "max_bytes": 16384
+  },
+  "watcher": {
+    "ignore": [
+      "**/node_modules/**",
+      "**/.git/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/out/**",
+      "**/target/**",
+      "**/.next/**",
+      "**/.nuxt/**",
+      "**/.turbo/**",
+      "**/.venv/**",
+      "**/venv/**",
+      "**/__pycache__/**",
+      "**/.cache/**",
+      "**/coverage/**",
+      "**/vendor/**",
+      "**/.opencode/**"
+    ]
+  },
+  "experimental": {
+    "batch_tool": true,
+    "mcp_timeout": 10000
+  },
+  "agent": {
+    "build": {
+      "model": "opencode-go/deepseek-v4-pro",
+      "mode": "primary",
+      "temperature": 0,
+      "permission": {
+        "edit": "allow",
+        "bash": "allow"
+      }
+    },
+    "plan": {
+      "model": "opencode-go/kimi-k3",
+      "temperature": 0.1,
+      "permission": {
+        "edit": "deny",
+        "bash": "ask"
+      }
+    },
+    "explore": {
+      "model": "opencode-go/glm-5.1",
+      "temperature": 0
+    },
+    "general": {
+      "disable": true
+    }
+  },
+  "provider": {
+    "opencode": {
+      "options": {
+        "setCacheKey": true,
+        "headerTimeout": 30000,
+        "timeout": 300000
+      }
+    },
+    "opencode-go": {
+      "options": {
+        "setCacheKey": true,
+        "headerTimeout": 30000,
+        "timeout": 300000
+      }
+    }
+  },
+  "mcp": {}
+}

@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "1.18.16"
+  }
+}

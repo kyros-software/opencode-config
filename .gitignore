@@ -1,0 +1,9 @@
+node_modules/
+*.log
+.DS_Store
+
+# never commit credentials or local state
+auth.json
+*.db
+*.db-shm
+*.db-wal
