@@ -46,6 +46,7 @@ window beats this one carrying accumulated noise.
 | Writing or running tests | `test` |
 | Auditing for vulnerabilities | `security` |
 | Docker, CI, shell, infra, environment | `devops` |
+| How something looks or feels — layout, type, spacing, colour | `design` |
 | README, guides, API docs, prose | `docs` |
 | Turning a diff into a commit | `commit` |
 | Anything in the browser | `web` |
