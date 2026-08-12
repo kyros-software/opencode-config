@@ -10,14 +10,20 @@ export const UPSTREAMS: Record<string, string> = {
 // home tier: the caller's Authorization header is forwarded verbatim and each
 // tier is a separate provider with its own API key, so a cross-tier hop would
 // present the wrong credential. Cross-tier candidates are skipped at runtime.
+// deepseek-v4-flash was removed from every chain in Aug 2026: it is gated behind
+// a China-region opt-in and answers with a non-retryable error, so as a candidate
+// it only burns a round-trip before the loop moves on. Re-add it if the opt-in is
+// ever done. Candidates below are verified reachable on this account.
 export const CHAINS: Record<string, string[]> = {
-  "go/deepseek-v4-pro":    ["go/kimi-k2.7-code", "go/deepseek-v4-flash", "go/mimo-v2.5"],
-  "go/deepseek-v4-flash":  ["go/mimo-v2.5", "go/minimax-m3"],
-  "go/qwen3.7-plus":       ["go/qwen3.6-plus", "go/deepseek-v4-flash"],
-  "go/qwen3.7-max":        ["go/kimi-k2.7-code", "go/deepseek-v4-pro", "go/deepseek-v4-flash"],
-  "go/qwen3.6-plus":       ["go/deepseek-v4-flash", "go/mimo-v2.5"],
-  "go/kimi-k2.7-code":     ["go/deepseek-v4-pro", "go/deepseek-v4-flash"],
-  "go/kimi-k3":            ["go/deepseek-v4-pro", "go/kimi-k2.7-code", "go/deepseek-v4-flash"],
+  "go/deepseek-v4-pro":    ["go/kimi-k2.7-code", "go/glm-5.1", "go/mimo-v2.5-pro"],
+  "go/qwen3.7-plus":       ["go/qwen3.6-plus", "go/glm-5.1", "go/minimax-m3"],
+  "go/qwen3.7-max":        ["go/kimi-k2.7-code", "go/deepseek-v4-pro", "go/glm-5.1"],
+  "go/qwen3.6-plus":       ["go/glm-5.1", "go/mimo-v2.5-pro"],
+  "go/kimi-k2.7-code":     ["go/deepseek-v4-pro", "go/glm-5.1", "go/minimax-m3"],
+  "go/kimi-k3":            ["go/deepseek-v4-pro", "go/kimi-k2.7-code", "go/glm-5.1"],
+  // glm-5.1 backs small_model plus the explore/commit/fast agents, so it needs
+  // its own chain — it was the one model with no route out.
+  "go/glm-5.1":            ["go/minimax-m3", "go/mimo-v2.5-pro", "go/qwen3.6-plus"],
 }
 
 const RETRY_STATUSES = new Set([429, 500, 502, 503, 504])

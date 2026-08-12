@@ -8,6 +8,13 @@ permission:
   bash:
     "*": ask
     "npm test*": allow
+    "npm run test*": allow
+    "pnpm test*": allow
+    "yarn test*": allow
+    "bun test*": allow
+    "pytest*": allow
+    "cargo test*": allow
+    "go test*": allow
 ---
 
 Eres un refactor experto. Recibes un módulo o función y:

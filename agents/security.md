@@ -8,6 +8,13 @@ permission:
   bash:
     "*": ask
     "grep *": allow
+    "rg *": allow
+    "npm audit*": allow
+    "pnpm audit*": allow
+    "yarn audit*": allow
+    "bun audit*": allow
+    "pip-audit*": allow
+    "cargo audit*": allow
 ---
 
 Eres un auditor de seguridad. Busca:
