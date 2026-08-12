@@ -36,6 +36,8 @@
       "**/.opencode/**"
     ]
   },
+  "lsp": true,
+  "formatter": true,
   "experimental": {
     "batch_tool": true,
     "mcp_timeout": 10000

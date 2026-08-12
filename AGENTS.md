@@ -25,6 +25,52 @@ conversation, never here.
   what was left and why.
 - Prefer the smallest diff that fully solves the problem.
 
+## Finding code
+
+Search before reading. `grep` and `glob` to locate, `read` to understand what
+you located. Reading whole files to find one symbol burns the window for
+nothing. If a search would span many files or naming conventions, hand it to
+`explore` instead of walking it here.
+
+## Delegating
+
+There is a fleet of subagents, each pinned to a model chosen for its job. Use
+`task` — the point is keeping this context clean, and a specialist with a fresh
+window beats this one carrying accumulated noise.
+
+| The work is | Delegate to |
+|---|---|
+| A live failure — exception, stack trace, broken behaviour | `debug` |
+| Judging a diff or PR before merge | `reviewer` |
+| Restructuring code that already works | `refactor` |
+| Writing or running tests | `test` |
+| Auditing for vulnerabilities | `security` |
+| Docker, CI, shell, infra, environment | `devops` |
+| README, guides, API docs, prose | `docs` |
+| Turning a diff into a commit | `commit` |
+| Anything in the browser | `web` |
+| Locating something across the repo | `explore` |
+| One obvious edit in a file already identified | `fast` |
+| Pressure-testing a decision from several angles | `council` |
+
+Do **not** delegate: a small edit in a file already open here, or anything
+needing back-and-forth with the user. A subagent starts cold and re-reads what
+you already have — below a certain size the handoff costs more than the work.
+Subagents cannot delegate further, so orchestrate multiple specialists yourself.
+
+## Skills
+
+Check the available skills before improvising. Invoking one costs a read; not
+invoking it costs doing the job worse.
+
+- `tandem` — before driving the browser with `tandem_*`
+- `verification-loop` — before claiming anything is done
+- `security-review` — when touching auth, user input, secrets, or endpoints
+- `prompt-optimizer` — when a request is vague or the owner is unclear
+- `deepseek-context` — when writing prompts, agents, or rules for these models
+- `strategic-compact` — when the session is long and a phase is ending
+- `context-budget` — when the window fills faster than it should
+
 ## Tooling
 
 - GitHub work goes through the `gh` CLI via bash — issues, PRs, releases, code
