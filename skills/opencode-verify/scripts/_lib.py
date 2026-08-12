@@ -7,7 +7,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-DEFAULT_MODEL = "opencode/deepseek-v4-flash-free"
+# Go tier, not zen: the zen provider has no balance on this account, and
+# opencode-go/deepseek-v4-flash is gated behind a China-region opt-in.
+DEFAULT_MODEL = "opencode-go/glm-5.1"
 MAX_SUMMARY_CHARS = 4000
 MAX_TOOL_NAMES = 40
 
@@ -145,7 +147,11 @@ def build_prompt(*, mode: str, module: str, base_url: str, persona: str) -> str:
             "and report concrete failures (console/UI/network) if any."
         )
 
-    return f"""You are an E2E verifier. Use the tandem browser MCP (browser_* tools).
+    return f"""You are an E2E verifier. Drive the browser with the tandem_* tools
+(an OpenCode plugin, not an MCP server): tandem_nav, tandem_snap, tandem_refs,
+tandem_click, tandem_type, tandem_press, tandem_wait, tandem_eval, tandem_cons,
+tandem_net, tandem_html, tandem_screenshot, tandem_status, tandem_reset.
+
 Do NOT dump full snapshots into the final answer — distill findings.
 
 Environment:
@@ -153,8 +159,19 @@ Environment:
 - Persona: {persona}
 - Site map: ~/.local/share/tandem/sites/localhost.md (read if useful)
 
-If browser_* fails with ECONNREFUSED on :9222, run `tandem-browser start` once via bash, then retry.
-Open your own tab so you do not steal the human focus tab.
+Operating notes:
+- tandem_nav starts Chrome if it is down. There is no separate start command.
+  tandem_status reports reachability.
+- Tandem already owns its own tab; you cannot and need not manage tabs.
+- Actions take a ref (s1, s2, …) from a snapshot, never a CSS selector.
+  tandem_wait and tandem_html do take selectors, but for waiting/reading only.
+- tandem_refs is free (no page round-trip) — prefer it over re-snapping.
+  Narrow snapshots with visible/role/tag instead of raising limit.
+- tandem_click already refreshes refs; do not chain a snapshot after it.
+- Evidence for PASS/FAIL comes from tandem_cons (exceptions), tandem_net
+  (failuresOnly: true) and tandem_eval assertions — not from screenshots.
+- If a captcha, 2FA or anti-bot checkpoint blocks the flow, stop and report it
+  as ERROR naming the wall and the URL. Do not attempt to defeat it.
 
 Task:
 {scope}

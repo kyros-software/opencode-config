@@ -1,6 +1,6 @@
 ---
 name: opencode-verify
-description: Offload E2E browser verify to OpenCode+Tandem (DeepSeek Flash); digest JSON (/opencode-verify).
+description: Offload E2E browser verify to OpenCode+Tandem (glm-5.1, go tier); digest JSON (/opencode-verify).
 disable-model-invocation: true
 disabled-environments:
   - cloud
@@ -45,17 +45,19 @@ Optional: `--model provider/model`, `--cwd /path`, `--timeout 600`, `--attach ht
 |---------|--------|
 | `pass` | Short OK to user; continue work. |
 | `fail` | Show `summary` / FAILURES; fix code or re-run once. |
-| `error` / `unknown` | Show `error` or `stderr_tail`; check Chrome (`tandem-browser status`) / stack up. |
+| `error` / `unknown` | Show `error` or `stderr_tail`; check Chrome (`tandem_status`) / stack up. |
 
 Exit codes: `0` pass, `2` fail/unknown, `1` script error.
 
 ### 3. Prerequisites (if error)
 
 1. Frontend/backend up (see product config `base_url`).
-2. `tandem-browser status` — if down: `tandem-browser start`.
-3. OpenCode has Tandem MCP (`~/.config/opencode/opencode.jsonc`).
+2. Chrome: no start command needed — `tandem_nav` launches it if it is down.
+   `tandem_status` reports reachability.
+3. OpenCode loads Tandem as a **plugin**, not an MCP server:
+   `~/.config/opencode/plugins/tandem.ts` (registers the 14 `tandem_*` tools).
 
-Optional warm server (avoids MCP cold boot on repeated runs):
+Optional warm server (avoids plugin cold boot on repeated runs):
 
 ```bash
 opencode serve --port 4096
@@ -80,6 +82,6 @@ opencode serve --port 4096
 ## Setup
 
 1. Copy `skills/opencode-verify/` to the agent runtime skills dir.
-2. OpenCode CLI installed; model `opencode/deepseek-v4-flash-free` available.
+2. OpenCode CLI installed; model `opencode-go/glm-5.1` available (go tier — zen has no balance).
 3. Tandem install for OpenCode: `plugins/tandem/install.sh --opencode`.
 4. Product: `.cursor/opencode-verify.md` (model, cwd, base_url, persona, timeout).
