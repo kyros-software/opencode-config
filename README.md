@@ -6,10 +6,13 @@ Kimi, Qwen) with a per-task subagent fleet.
 ## Install
 
 ```bash
-git clone <this-repo> ~/opencode-config
+git clone git@github.com:kyros-software/opencode-config.git ~/opencode-config
 cd ~/opencode-config
 ./install.sh            # --dry-run to preview
 ```
+
+Private repo — the SSH key on the target machine must belong to an account with
+access to the `kyros-software` org.
 
 Backs up any existing `~/.config/opencode` to `~/.config/opencode.backup-<timestamp>`
 before writing.
