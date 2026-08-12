@@ -60,7 +60,10 @@
     },
     "explore": {
       "model": "opencode-go/glm-5.1",
-      "temperature": 0
+      "temperature": 0,
+      "permission": {
+        "tandem_*": "deny"
+      }
     },
     "general": {
       "disable": true

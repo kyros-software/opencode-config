@@ -3,6 +3,8 @@ description: Escribe prosa para humanos: README, guías, docs de API, JSDoc/TSDo
 mode: subagent
 model: opencode-go/qwen3.7-plus
 permission:
+  # tandem_* no aparece en el prompt si se deniega: -4559 tokens
+  "tandem_*": deny
   edit: allow
   bash: deny
 ---
