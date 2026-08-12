@@ -16,6 +16,19 @@ the human's other tabs are untouched. So you are not fighting for their focus.
 command to ask for. If something looks wrong, `tandem_status` reports whether
 Chrome is reachable, which tab is owned, and what is buffered.
 
+## First: are the tools even here?
+
+These tools come from a plugin (`~/.config/opencode/plugins/tandem.ts`). If it
+did not load — `opencode --pure`, a missing install, a plugin error — the
+`tandem_*` tools **do not exist in this session**.
+
+They are tools, never shell commands. If `tandem_nav` is not in your tool list,
+running `tandem_nav <url>` through bash produces `command not found`, and
+delegating to the `web` subagent does not help: it has no tools you lack.
+
+So if the tools are absent, **stop and say the plugin is not loaded**. Do not
+improvise a substitute — there is no way to drive the browser without them.
+
 ## The 14 tools
 
 **Navigate and see**
