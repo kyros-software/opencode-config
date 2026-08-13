@@ -10,27 +10,50 @@ export const UPSTREAMS: Record<string, string> = {
 // home tier: the caller's Authorization header is forwarded verbatim and each
 // tier is a separate provider with its own API key, so a cross-tier hop would
 // present the wrong credential. Cross-tier candidates are skipped at runtime.
-// deepseek-v4-flash was removed from every chain in Aug 2026: it is gated behind
-// a China-region opt-in and answers with a non-retryable error, so as a candidate
-// it only burns a round-trip before the loop moves on. Re-add it if the opt-in is
-// ever done. Candidates below are verified reachable on this account.
+//
+// Invariant: every model pinned anywhere in opencode.json or agents/*.md needs a
+// key here. A model with no chain is a single point of failure for whichever
+// agents pin it, and the primary having no chain takes the whole session down.
+// Both deepseek models are gated behind a China-region opt-in as of Aug 2026 and
+// answer 403/RegionError; they keep their chains so a request for one routes
+// away, but no chain lists them as a candidate. Every candidate below was probed
+// against the live Go upstream and answered 200.
 export const CHAINS: Record<string, string[]> = {
-  "go/deepseek-v4-pro":    ["go/kimi-k2.7-code", "go/glm-5.1", "go/mimo-v2.5-pro"],
+  "go/gpt-5.6-luna":       ["go/kimi-k3", "go/kimi-k2.7-code", "go/glm-5.1"],
+  "go/kimi-k3":            ["go/kimi-k2.7-code", "go/glm-5.1", "go/minimax-m3"],
+  "go/kimi-k2.7-code":     ["go/kimi-k3", "go/glm-5.1", "go/minimax-m3"],
+  "go/qwen3.8-max":        ["go/qwen3.7-plus", "go/kimi-k3", "go/glm-5.1"],
   "go/qwen3.7-plus":       ["go/qwen3.6-plus", "go/glm-5.1", "go/minimax-m3"],
-  "go/qwen3.7-max":        ["go/kimi-k2.7-code", "go/deepseek-v4-pro", "go/glm-5.1"],
   "go/qwen3.6-plus":       ["go/glm-5.1", "go/mimo-v2.5-pro"],
-  "go/kimi-k2.7-code":     ["go/deepseek-v4-pro", "go/glm-5.1", "go/minimax-m3"],
-  "go/kimi-k3":            ["go/deepseek-v4-pro", "go/kimi-k2.7-code", "go/glm-5.1"],
-  // glm-5.1 backs small_model plus the explore/commit/fast agents, so it needs
-  // its own chain — it was the one model with no route out.
+  // glm-5.1 backs small_model plus the explore/commit/fast/web agents, so it
+  // needs its own chain — it was the one model with no route out.
   "go/glm-5.1":            ["go/minimax-m3", "go/mimo-v2.5-pro", "go/qwen3.6-plus"],
+  "go/deepseek-v4-pro":    ["go/kimi-k2.7-code", "go/glm-5.1", "go/mimo-v2.5-pro"],
+  "go/deepseek-v4-flash":  ["go/kimi-k2.7-code", "go/glm-5.1", "go/mimo-v2.5-pro"],
 }
 
 const RETRY_STATUSES = new Set([429, 500, 502, 503, 504])
 
+// Upstream answers "that model is not available to you" on a status that also
+// carries "your credential is wrong", so only the error type in the body tells
+// them apart. A model that went away has to fall down the chain; a bad key has to
+// surface immediately rather than burn every candidate.
+//
+// This list is the whole reason the fleet sat out the Aug 2026 deepseek outage:
+// it held 401 alone, deepseek-v4-pro went China-only behind 403/RegionError, and
+// every request for it passed straight through to the caller with the chain
+// never consulted. When upstream invents the next way to retire a model, this is
+// the list that needs it — not the chains.
+const MODEL_UNAVAILABLE_STATUSES = new Set([401, 403, 404])
+const MODEL_UNAVAILABLE_TYPES = new Set(["ModelError", "RegionError"])
+
 // Guards time-to-first-byte only, never the body stream: a long generation is
-// expected to keep streaming well past this.
-const DEFAULT_HEADERS_TIMEOUT_MS = 60_000
+// expected to keep streaming well past this. Must stay well under the client's
+// own `headerTimeout` (opencode.json) divided by the longest chain: the client
+// aborting mid-walk kills the fallback outright, because an aborted request is
+// indistinguishable from the caller hanging up and the loop rethrows instead of
+// trying the next candidate.
+const DEFAULT_HEADERS_TIMEOUT_MS = 15_000
 
 function parseCandidate(s: string): { tier: string; model: string } | null {
   const idx = s.indexOf("/")
@@ -162,12 +185,13 @@ export function createProxyServer(opts: ProxyOptions) {
   })
 }
 
-/** The upstream reports an unsupported model as 401 + this error type. */
-function isModelError(body: string): boolean {
+/** The error type upstream names in the body, or "" if this is not its error shape. */
+function upstreamErrorType(body: string): string {
   try {
-    return (JSON.parse(body) as any)?.error?.type === "ModelError"
+    const type = (JSON.parse(body) as any)?.error?.type
+    return typeof type === "string" ? type : ""
   } catch {
-    return false
+    return ""
   }
 }
 
@@ -188,16 +212,15 @@ async function classifyPrimaryFailure(res: Response, model: string): Promise<Pri
     return { passThrough: false, reason: `${model} returned ${res.status}`, held: await buffer(res) }
   }
 
-  // 401 is overloaded upstream: it means both "your API key is wrong" and "that
-  // model is not supported", and only the body separates them. A retired model
-  // has to fall down the chain, while a bad key has to surface immediately
-  // rather than burn every candidate.
-  if (res.status === 401) {
+  // These statuses are overloaded upstream — the same 401 means "your API key is
+  // wrong" and "that model is not supported" — so the body is what decides.
+  if (MODEL_UNAVAILABLE_STATUSES.has(res.status)) {
     const body = await res.text().catch(() => "")
     // The body was consumed to inspect it, so hand back an equivalent response.
     const held = new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers })
-    if (isModelError(body)) {
-      return { passThrough: false, reason: `${model} is no longer supported upstream`, held }
+    const type = upstreamErrorType(body)
+    if (MODEL_UNAVAILABLE_TYPES.has(type)) {
+      return { passThrough: false, reason: `${model} is unavailable upstream (${type})`, held }
     }
     return { passThrough: true, response: held }
   }

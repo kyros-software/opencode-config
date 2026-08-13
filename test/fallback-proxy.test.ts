@@ -1,4 +1,5 @@
 import { describe, it, expect } from "bun:test"
+import { readFileSync, readdirSync } from "node:fs"
 import { createProxyServer, UPSTREAMS, CHAINS } from "../fallback-proxy-lib"
 
 type Seen = { path: string; model?: string; auth?: string }
@@ -7,11 +8,22 @@ function json(status: number, data: unknown) {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } })
 }
 
-// Verbatim shapes observed from https://opencode.ai/zen/go/v1 — the upstream
-// answers 401 for both of these, so only the body tells them apart.
+// Verbatim shapes observed from https://opencode.ai/zen/go/v1. Two axes vary
+// independently — the status and the error type — and both have to be read: 401
+// carries a retired model and a bad key alike, while 403 carries a region-gated
+// model and an ordinary refusal alike.
 const modelError = (model: string | undefined) =>
   json(401, { type: "error", error: { type: "ModelError", message: `Model ${model} is not supported` } })
+const regionError = () =>
+  json(403, {
+    type: "error",
+    error: {
+      type: "RegionError",
+      message: "The latest version of this model is only available hosted in China and requires explicit opt in",
+    },
+  })
 const badKey = () => json(401, { type: "error", error: { type: "AuthError", message: "invalid api key" } })
+const forbidden = () => json(403, { type: "error", error: { type: "PermissionError", message: "not your workspace" } })
 
 /** An upstream that records what it was asked for and answers per model. */
 function startUpstream(respond: (model: string | undefined, req: Request) => Response | Promise<Response>) {
@@ -106,6 +118,35 @@ describe("config invariants", () => {
         expect(candidate).not.toBe(key)
       }
       expect(new Set(candidates).size).toBe(candidates.length)
+    }
+  })
+
+  it("gives every model this config pins a chain to fall down", () => {
+    // The Aug 2026 outage had two halves and this is the second one: the manual
+    // workaround repointed build at a model that had no chain, so the config came
+    // back up with no fallback at all and nothing said so. A model pinned by an
+    // agent but absent from CHAINS is a single point of failure for that agent;
+    // when it is the primary, it is one for the whole session.
+    const root = new URL("..", import.meta.url).pathname
+    const sources = [
+      readFileSync(`${root}/opencode.json`, "utf8"),
+      ...readdirSync(`${root}/agents`)
+        .filter((f) => f.endsWith(".md"))
+        .map((f) => readFileSync(`${root}/agents/${f}`, "utf8")),
+    ]
+    // Only the Go tier is chained: Zen models are Anthropic's own and have no
+    // sibling worth swapping in.
+    const pinned = new Set(sources.flatMap((s) => [...s.matchAll(/opencode-go\/([\w.-]+)/g)].map((m) => m[1])))
+    expect(pinned.size).toBeGreaterThan(0)
+    for (const model of pinned) expect(CHAINS[`go/${model}`]).toBeDefined()
+  })
+
+  it("never routes to a model that is known dead", () => {
+    // A dead candidate is not a bug, only a wasted round-trip — but it is a
+    // wasted round-trip on the path the caller is already waiting out.
+    const dead = ["go/deepseek-v4-pro", "go/deepseek-v4-flash", "go/kimi-k2.6"]
+    for (const candidates of Object.values(CHAINS)) {
+      for (const candidate of candidates) expect(dead).not.toContain(candidate)
     }
   })
 })
@@ -214,7 +255,43 @@ describe("fallback-proxy", () => {
         expect(res.status).toBe(200)
         expect((await res.json()).model).toBe("deepseek-v4-flash")
         expect(go.map((s) => s.model)).toEqual(["kimi-k3", "deepseek-v4-flash"])
-        expect(logs.some((l) => /no longer supported/.test(l))).toBe(true)
+        expect(logs.some((l) => /unavailable upstream \(ModelError\)/.test(l))).toBe(true)
+      },
+    )
+  })
+
+  it("routes around a requested model that upstream has region-gated", async () => {
+    // The Aug 2026 outage in one test. deepseek-v4-pro went China-only and
+    // started answering 403/RegionError; the classifier knew only 401/ModelError,
+    // so this failure passed straight through to the caller and the chain — which
+    // existed, and whose first candidate was healthy — was never consulted.
+    await withRig(
+      {
+        chains: { "go/deepseek-v4-pro": ["go/kimi-k2.7-code"] },
+        go: (model) => (model === "deepseek-v4-pro" ? regionError() : json(200, { model })),
+      },
+      async ({ post, logs, swaps, go }) => {
+        const res = await post("go", { model: "deepseek-v4-pro", messages: [] })
+        expect(res.status).toBe(200)
+        expect((await res.json()).model).toBe("kimi-k2.7-code")
+        expect(go.map((s) => s.model)).toEqual(["deepseek-v4-pro", "kimi-k2.7-code"])
+        expect(logs.some((l) => /unavailable upstream \(RegionError\)/.test(l))).toBe(true)
+        expect(swaps).toEqual(["deepseek-v4-pro→kimi-k2.7-code"])
+      },
+    )
+  })
+
+  it("surfaces a 403 the chain cannot cover instead of burning it", async () => {
+    // Same status as the region gate, different type. Widening the classifier by
+    // status alone would swallow this and report a misleading 503 four requests
+    // later; it is the error type that says whether a swap can help.
+    await withRig(
+      { chains: { "go/kimi-k3": ["go/kimi-k2.7-code", "go/glm-5.1"] }, go: () => forbidden() },
+      async ({ post, go }) => {
+        const res = await post("go", { model: "kimi-k3", messages: [] })
+        expect(res.status).toBe(403)
+        expect((await res.json()).error.type).toBe("PermissionError")
+        expect(go).toHaveLength(1)
       },
     )
   })

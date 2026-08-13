@@ -4,6 +4,6 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@opencode-ai/plugin": "1.18.16"
+    "@opencode-ai/plugin": "1.18.18"
   }
 }
