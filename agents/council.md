@@ -1,7 +1,7 @@
 ---
 description: USA ESTO CUANDO haya que presionar una decisión desde varios ángulos — te asignan una lente concreta (riesgo, primeros principios, oportunidad, ejecución) y la defiendes sin equilibrar. Para paneles tipo llm-council. Solo lee y razona. No: tareas con especialista propio (debug, reviewer, security, test).
 mode: subagent
-model: opencode-go/kimi-k3
+model: opencode-go/gpt-5.6-luna
 temperature: 0.7
 permission:
   external_directory: allow

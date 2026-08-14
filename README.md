@@ -62,11 +62,30 @@ Every agent pins its own model, so one dead model breaks one agent, not the flee
 | explore | `gpt-5.6-luna` | 0 |
 | test | `deepseek-v4-pro` | 0 |
 | debug, reviewer | `kimi-k2.7-code` | 0 |
-| refactor, security, council | `kimi-k3` | 0 / 0.7 |
+| refactor | `deepseek-v4-pro` | 0 |
+| security | `kimi-k2.7-code` | 0 |
+| council | `gpt-5.6-luna` | 0.7 |
 | devops | `qwen3.6-plus` | 0 |
 | docs | `qwen3.7-plus` | default |
 | commit, fast, web | `gpt-5.6-luna` | 0 |
 | `small_model` | `gpt-5.6-luna` | — |
+
+### kimi-k3 held five roles on one argument
+
+At 3/15/0.3 it is the priciest model here — 12× the primary on a timed task, 19×
+on a longer one. It was pinned to `plan`, `architect`, `refactor`, `security` and
+`council`, and the case for keeping it was made once, for all five at once. Those
+five are not one question:
+
+| role | why it left, or stayed |
+|---|---|
+| `refactor` | Behaviour-preserving by definition, so the existing suite *is* the oracle. Verification is free, which caps the downside of a cheaper model. → `deepseek-v4-pro` |
+| `security` | Detection, not generation, and it has a textbook oracle: seed known vulnerabilities, count what gets found. Moved alongside `reviewer`, its nearest sibling. → `kimi-k2.7-code` |
+| `council` | Its value is *disagreement diversity*, not quality — and it shared a model with `architect` and `plan`, the very agents it exists to pressure-test. A cheap model from a different lineage beats an expensive one that thinks like the thing under review. → `gpt-5.6-luna` |
+| `plan`, `architect` | Genuinely contested. A design document has no oracle; a design *under a known subsequent change* does. Until that harness exists, the premium stays. |
+
+The three that moved cost nothing to reverse — one line each — and none of them
+needed the contested argument to justify the move.
 
 ### The cheap tier is `gpt-5.6-luna`, not glm-5.1
 
