@@ -451,6 +451,92 @@ describe("fallback-proxy", () => {
     )
   })
 
+  it("errors a stream that goes silent mid-body", async () => {
+    // The Aug 2026 kimi-k3 stall: headers arrived, so the header guard was already
+    // cleared, and then nothing for 276s while the chain sat unused. Falling back
+    // is impossible once the caller is reading, so the only honest move is to end
+    // the stream loudly instead of hanging the session.
+    const go = startUpstream(
+      () =>
+        new Response(
+          new ReadableStream({
+            start(c) {
+              c.enqueue(new TextEncoder().encode('data: {"first":true}\n\n'))
+              // ...and then never again.
+            },
+          }),
+          { status: 200, headers: { "content-type": "text/event-stream" } },
+        ),
+    )
+    const logs: string[] = []
+    const proxy = createProxyServer({
+      log: (m) => logs.push(m),
+      upstreams: { zen: go.url, go: go.url },
+      chains: {},
+      streamIdleMs: 150,
+    })
+    try {
+      const started = Date.now()
+      const res = await fetch(`http://127.0.0.1:${proxy.port}/go/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ model: "stalls-midway", messages: [] }),
+      })
+      expect(res.status).toBe(200) // headers were fine; the body is what dies
+      // The client keeps whatever arrived and the stream ends — the point is that
+      // it *ends*, in a fraction of a second, instead of hanging until something
+      // upstream of the session gives up minutes later.
+      const text = await res.text()
+      expect(text).toContain("first")
+      expect(Date.now() - started).toBeLessThan(3_000)
+      expect(logs.some((l) => /silent mid-stream/.test(l))).toBe(true)
+    } finally {
+      proxy.stop(true)
+      go.server.stop(true)
+    }
+  })
+
+  it("lets a slow but living stream run past the idle window", async () => {
+    // The guard must bound the gap between chunks, never the generation. A model
+    // that streams steadily for minutes is working, not stalled — capping total
+    // duration here would kill exactly the long tasks the fleet exists for.
+    const go = startUpstream(
+      () =>
+        new Response(
+          new ReadableStream({
+            async start(c) {
+              const enc = new TextEncoder()
+              for (let i = 0; i < 6; i++) {
+                c.enqueue(enc.encode(`chunk${i} `))
+                await Bun.sleep(60) // each gap under the window; total well over it
+              }
+              c.close()
+            },
+          }),
+          { status: 200 },
+        ),
+    )
+    const proxy = createProxyServer({
+      log: () => {},
+      upstreams: { zen: go.url, go: go.url },
+      chains: {},
+      streamIdleMs: 150,
+    })
+    try {
+      const res = await fetch(`http://127.0.0.1:${proxy.port}/go/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ model: "slow-but-alive", messages: [] }),
+      })
+      const text = await res.text()
+      expect(text).toContain("chunk0")
+      expect(text).toContain("chunk5")
+    } finally {
+      proxy.stop(true)
+      go.server.stop(true)
+    }
+  })
+
   it("binds to loopback only", async () => {
     const server = createProxyServer({
       log: () => {},

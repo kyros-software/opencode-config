@@ -68,6 +68,18 @@ const MODEL_UNAVAILABLE_TYPES = new Set(["ModelError", "RegionError"])
 // trying the next candidate.
 const DEFAULT_HEADERS_TIMEOUT_MS = 15_000
 
+// Headers are not the only way a request dies. kimi-k3 once opened a stream and
+// then said nothing for 276 seconds — in=0, out=0, finish=None — while its chain
+// sat unused, because the guard above had already been satisfied and cleared.
+//
+// This is an *idle* timeout, reset by every chunk, never a cap on total duration:
+// a long generation streams continuously and must be allowed to run for as long
+// as it likes. What it kills is silence. It cannot fall down the chain — by the
+// time bytes are flowing the caller is already reading the response — so it ends
+// the stream with an error instead, which surfaces in seconds rather than
+// stalling the session until something else gives up.
+const DEFAULT_STREAM_IDLE_MS = 90_000
+
 function parseCandidate(s: string): { tier: string; model: string } | null {
   const idx = s.indexOf("/")
   if (idx <= 0 || idx === s.length - 1) return null
@@ -87,6 +99,8 @@ export type ProxyOptions = {
   upstreams?: Record<string, string>
   chains?: Record<string, string[]>
   headersTimeoutMs?: number
+  /** Silence allowed *between* chunks once the body is flowing. 0 disables. */
+  streamIdleMs?: number
 }
 
 export function createProxyServer(opts: ProxyOptions) {
@@ -96,6 +110,7 @@ export function createProxyServer(opts: ProxyOptions) {
     upstreams = UPSTREAMS,
     chains = CHAINS,
     headersTimeoutMs = DEFAULT_HEADERS_TIMEOUT_MS,
+    streamIdleMs = DEFAULT_STREAM_IDLE_MS,
   } = opts
   return Bun.serve({
     // Loopback only: this is an unauthenticated forwarder to the upstream.
@@ -111,18 +126,18 @@ export function createProxyServer(opts: ProxyOptions) {
       const target = upstreams[homeTier]
 
       if (!tierMatch || !restPath.endsWith("/chat/completions")) {
-        return proxyTo(target, restPath + url.search, req, null, headersTimeoutMs)
+        return proxyTo(target, restPath + url.search, req, null, headersTimeoutMs, streamIdleMs)
       }
 
       let body: any
       try {
         body = await req.clone().json()
       } catch {
-        return proxyTo(target, restPath + url.search, req, null, headersTimeoutMs)
+        return proxyTo(target, restPath + url.search, req, null, headersTimeoutMs, streamIdleMs)
       }
 
       const model = body?.model
-      if (!model) return proxyTo(target, restPath + url.search, req, null, headersTimeoutMs)
+      if (!model) return proxyTo(target, restPath + url.search, req, null, headersTimeoutMs, streamIdleMs)
 
       const originalBodyStr = JSON.stringify(body)
       const chainKey = `${homeTier}/${model}`
@@ -150,7 +165,8 @@ export function createProxyServer(opts: ProxyOptions) {
 
         let res: Response
         try {
-          res = await proxyTo(target, restPath + url.search, req, bodyStr, headersTimeoutMs)
+          res = await proxyTo(target, restPath + url.search, req, bodyStr, headersTimeoutMs, streamIdleMs, () =>
+            log(`${candidateModel} went silent mid-stream after ${streamIdleMs}ms`))
         } catch (err) {
           // The client hung up — retrying down the chain would burn quota on a
           // response nobody will read.
@@ -247,12 +263,56 @@ async function buffer(res: Response): Promise<Response> {
   return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers })
 }
 
+/**
+ * Wraps a body stream so that silence longer than `idleMs` errors it, while a
+ * stream that keeps producing passes through untouched. The clock restarts on
+ * every chunk, so this bounds the gap between bytes, never the generation itself.
+ */
+function guardIdleStream(body: ReadableStream<Uint8Array>, idleMs: number, onIdle: () => void): ReadableStream<Uint8Array> {
+  const reader = body.getReader()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const clear = () => {
+    if (timer !== undefined) clearTimeout(timer)
+    timer = undefined
+  }
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const idle = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`upstream stream idle for ${idleMs}ms`)), idleMs)
+      })
+      try {
+        const { done, value } = await Promise.race([reader.read(), idle])
+        clear()
+        if (done) {
+          controller.close()
+          return
+        }
+        controller.enqueue(value)
+      } catch (err) {
+        clear()
+        onIdle()
+        // The caller is already consuming the response, so there is no chain left
+        // to walk — erroring the stream is what turns a silent hang into a visible
+        // failure the session can react to.
+        await reader.cancel().catch(() => {})
+        controller.error(err)
+      }
+    },
+    cancel(reason) {
+      clear()
+      return reader.cancel(reason)
+    },
+  })
+}
+
 async function proxyTo(
   targetUrl: string,
   pathQuery: string,
   req: Request,
   body: string | null,
   headersTimeoutMs: number,
+  streamIdleMs = 0,
+  onIdle: () => void = () => {},
 ): Promise<Response> {
   const upstreamUrl = `${targetUrl}${pathQuery}`
   const headers = new Headers(req.headers)
@@ -287,5 +347,8 @@ async function proxyTo(
   outHeaders.delete("transfer-encoding")
   outHeaders.delete("connection")
 
-  return new Response(res.body, { status: res.status, statusText: res.statusText, headers: outHeaders })
+  const out =
+    streamIdleMs > 0 && res.body ? guardIdleStream(res.body, streamIdleMs, onIdle) : res.body
+
+  return new Response(out, { status: res.status, statusText: res.statusText, headers: outHeaders })
 }
