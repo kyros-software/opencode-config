@@ -60,9 +60,9 @@ Every agent pins its own model, so one dead model breaks one agent, not the flee
 | design | `qwen3.8-max` | **0.8** |
 | plan | `kimi-k3` | 0.1 |
 | explore | `gpt-5.6-luna` | 0 |
-| test | `deepseek-v4-pro` | 0 |
+| test | `gpt-5.6-luna` | 0 |
 | debug, reviewer | `kimi-k2.7-code` | 0 |
-| refactor | `deepseek-v4-pro` | 0 |
+| refactor | `kimi-k2.7-code` | 0 |
 | security | `kimi-k2.7-code` | 0 |
 | council | `gpt-5.6-luna` | 0.7 |
 | devops | `qwen3.6-plus` | 0 |
@@ -79,7 +79,7 @@ five are not one question:
 
 | role | why it left, or stayed |
 |---|---|
-| `refactor` | Behaviour-preserving by definition, so the existing suite *is* the oracle. Verification is free, which caps the downside of a cheaper model. → `deepseek-v4-pro` |
+| `refactor` | Behaviour-preserving by definition, so the existing suite *is* the oracle. Verification is free, which caps the downside of a cheaper model. Went to the primary's model first and hung every time — see trap 4 — so it sits with `reviewer` instead. → `kimi-k2.7-code` |
 | `security` | Detection, not generation, and it has a textbook oracle: seed known vulnerabilities, count what gets found. Moved alongside `reviewer`, its nearest sibling. → `kimi-k2.7-code` |
 | `council` | Its value is *disagreement diversity*, not quality — and it shared a model with `architect` and `plan`, the very agents it exists to pressure-test. A cheap model from a different lineage beats an expensive one that thinks like the thing under review. → `gpt-5.6-luna` |
 | `plan`, `architect` | Genuinely contested. A design document has no oracle; a design *under a known subsequent change* does. Until that harness exists, the premium stays. |
@@ -202,7 +202,7 @@ MCP earns its cost only for things with no CLI equivalent. If you add one:
 "permission": { "mcp_*": "ask" }
 ```
 
-## Three traps that cost hours to find
+## Four traps that cost hours to find
 
 Both make a non-interactive run hang until it times out, with no error and no
 session in the database. Neither is documented upstream.
@@ -259,6 +259,32 @@ Only the bare `"allow"` was verified to work. It is also the honest setting:
 `build` already runs `bash: "allow"`, so it can `cat` any file on the machine.
 Restricting `external_directory` underneath an unrestricted shell protects
 nothing and only costs you runs.
+
+**4. A subagent pinned to the primary's own model hangs.**
+
+Delegate to it and the child turn opens, emits zero tokens, and sits there until
+something kills the run. In the session database it looks exactly like an upstream
+stall — `out=0`, `finish=None`, no completion time — which sends you hunting in the
+wrong place. Repin the identical task to any other model and it finishes in
+seconds.
+
+Measured twice, then confirmed by a controlled swap: `refactor` on the primary's
+model stalled 2 for 2 and produced nothing; moved to another model it did the
+refactor immediately. `security` and `council`, both on models different from the
+primary, worked first try.
+
+```bash
+# the tell — same model on both rows, child never completes
+opencode db "SELECT data FROM message WHERE data LIKE '%<run-dir>%'"
+#   agent=build     modelo=deepseek-v4-pro  dur=3.5  out=46
+#   agent=refactor  modelo=deepseek-v4-pro  dur=SIN COMPLETAR  out=0
+```
+
+`bun test` enforces the constraint now, because nothing else surfaces it: no unit
+test delegates, so the collision is invisible until real work hits it. Note the
+guard is about *collision with whatever `model` is set to*, not about any
+particular model — change the primary and a previously fine subagent becomes the
+broken one.
 
 **Bonus, for measuring:** `sessionID` is a *column* (`session_id`) on `message`,
 not a field inside its JSON. And prompt size is `tokens.input + tokens.cache.read`

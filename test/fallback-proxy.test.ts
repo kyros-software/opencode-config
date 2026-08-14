@@ -154,6 +154,24 @@ describe("config invariants", () => {
     }
   })
 
+  it("never gives a subagent the primary's own model", () => {
+    // Measured, twice, then confirmed by a controlled swap: a subagent pinned to
+    // the same model as the primary starts, emits zero tokens, and hangs until
+    // something kills the run. Repin the identical task to any other model and it
+    // completes in seconds. Two agents had drifted into the collision — one I put
+    // there — and neither shows up until you actually delegate, which no unit test
+    // does. This is the cheap guard for a failure that costs a whole session.
+    const root = new URL("..", import.meta.url).pathname
+    const config = JSON.parse(readFileSync(`${root}/opencode.json`, "utf8"))
+    const primary = config.model
+    expect(primary).toBeTruthy()
+
+    for (const file of readdirSync(`${root}/agents`).filter((f) => f.endsWith(".md"))) {
+      const pin = readFileSync(`${root}/agents/${file}`, "utf8").match(/^model:\s*(\S+)/m)?.[1]
+      if (pin) expect(`${file}: ${pin}`).not.toBe(`${file}: ${primary}`)
+    }
+  })
+
   it("never falls back to a strictly dominated model", () => {
     // glm-5.1 is 1.4/4.4/0.26 against kimi-k2.7-code's 0.95/4/0.19 — worse on
     // input, output and cache_read alike — and it was slower than luna and
