@@ -141,12 +141,30 @@ describe("config invariants", () => {
     for (const model of pinned) expect(CHAINS[`go/${model}`]).toBeDefined()
   })
 
-  it("never routes to a model that is known dead", () => {
-    // A dead candidate is not a bug, only a wasted round-trip — but it is a
-    // wasted round-trip on the path the caller is already waiting out.
-    const dead = ["go/deepseek-v4-pro", "go/deepseek-v4-flash", "go/kimi-k2.6"]
+  it("never falls back to a model with a history of disappearing", () => {
+    // Both deepseek models are reachable again as of this commit, so this is no
+    // longer about dead candidates — it is about which models are allowed to be
+    // somebody's safety net. A fallback has to be more available than the thing
+    // it replaces. These two went region-gated for a month; they can be primaries
+    // (a chain covers them) but never candidates, or an outage in one model
+    // routes traffic straight into the one with the worst availability record.
+    const neverACandidate = ["go/deepseek-v4-pro", "go/deepseek-v4-flash"]
     for (const candidates of Object.values(CHAINS)) {
-      for (const candidate of candidates) expect(dead).not.toContain(candidate)
+      for (const candidate of candidates) expect(neverACandidate).not.toContain(candidate)
+    }
+  })
+
+  it("never falls back to a strictly dominated model", () => {
+    // glm-5.1 is 1.4/4.4/0.26 against kimi-k2.7-code's 0.95/4/0.19 — worse on
+    // input, output and cache_read alike — and it was slower than luna and
+    // deepseek in a measured run. It once sat in 8 of 9 chains, which meant every
+    // outage funnelled traffic into the priciest model on the account at the
+    // moment things were already going wrong. A fallback is picked under duress;
+    // that is exactly when nobody is watching the bill.
+    const dominated = ["go/glm-5.1"]
+    for (const [key, candidates] of Object.entries(CHAINS)) {
+      expect(dominated).not.toContain(key)
+      for (const candidate of candidates) expect(dominated).not.toContain(candidate)
     }
   })
 })

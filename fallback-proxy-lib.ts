@@ -14,22 +14,35 @@ export const UPSTREAMS: Record<string, string> = {
 // Invariant: every model pinned anywhere in opencode.json or agents/*.md needs a
 // key here. A model with no chain is a single point of failure for whichever
 // agents pin it, and the primary having no chain takes the whole session down.
-// Both deepseek models are gated behind a China-region opt-in as of Aug 2026 and
-// answer 403/RegionError; they keep their chains so a request for one routes
-// away, but no chain lists them as a candidate. Every candidate below was probed
-// against the live Go upstream and answered 200.
+//
+// Both deepseek models spent Aug 2026 behind a China-region opt-in answering
+// 403/RegionError, and both came back. deepseek-v4-pro is the primary again — a
+// chain covers it, so its next disappearance costs a round-trip instead of a
+// session. It stays out of every other model's candidate list, though: a fallback
+// has to be more available than the thing it replaces, and this is the one model
+// on the account with a demonstrated history of vanishing. Same for -flash.
+// Every candidate below was probed against the live Go upstream and answered 200.
+// A candidate is also a price decision. glm-5.1 used to sit in 8 of these 9
+// chains — every outage funnelled into it — while being strictly dominated:
+// 1.4/4.4/0.26 against kimi-k2.7-code's 0.95/4/0.19 on every axis, and slower
+// than both luna and deepseek in a measured run. It is now in none of them, and
+// pinned nowhere, so it has no chain of its own either.
+//
+// Order within a chain is capability-tier first, then price. Reasoning models
+// fall to reasoning models; the cheap agents fall to cheap models. Dropping
+// `architect` straight to a budget model would keep the session alive and make
+// its output worthless, which is not what a fallback is for.
 export const CHAINS: Record<string, string[]> = {
-  "go/gpt-5.6-luna":       ["go/kimi-k3", "go/kimi-k2.7-code", "go/glm-5.1"],
-  "go/kimi-k3":            ["go/kimi-k2.7-code", "go/glm-5.1", "go/minimax-m3"],
-  "go/kimi-k2.7-code":     ["go/kimi-k3", "go/glm-5.1", "go/minimax-m3"],
-  "go/qwen3.8-max":        ["go/qwen3.7-plus", "go/kimi-k3", "go/glm-5.1"],
-  "go/qwen3.7-plus":       ["go/qwen3.6-plus", "go/glm-5.1", "go/minimax-m3"],
-  "go/qwen3.6-plus":       ["go/glm-5.1", "go/mimo-v2.5-pro"],
-  // glm-5.1 backs small_model plus the explore/commit/fast/web agents, so it
-  // needs its own chain — it was the one model with no route out.
-  "go/glm-5.1":            ["go/minimax-m3", "go/mimo-v2.5-pro", "go/qwen3.6-plus"],
-  "go/deepseek-v4-pro":    ["go/kimi-k2.7-code", "go/glm-5.1", "go/mimo-v2.5-pro"],
-  "go/deepseek-v4-flash":  ["go/kimi-k2.7-code", "go/glm-5.1", "go/mimo-v2.5-pro"],
+  "go/deepseek-v4-pro":    ["go/gpt-5.6-luna", "go/kimi-k2.7-code", "go/mimo-v2.5-pro"],
+  "go/gpt-5.6-luna":       ["go/mimo-v2.5-pro", "go/minimax-m3", "go/qwen3.7-plus"],
+  "go/kimi-k3":            ["go/kimi-k2.7-code", "go/qwen3.8-max", "go/minimax-m3"],
+  "go/kimi-k2.7-code":     ["go/kimi-k3", "go/minimax-m3", "go/gpt-5.6-luna"],
+  "go/qwen3.8-max":        ["go/qwen3.7-plus", "go/kimi-k3", "go/minimax-m3"],
+  "go/qwen3.7-plus":       ["go/qwen3.6-plus", "go/minimax-m3", "go/gpt-5.6-luna"],
+  "go/qwen3.6-plus":       ["go/qwen3.7-plus", "go/mimo-v2.5-pro", "go/gpt-5.6-luna"],
+  // Unpinned, but kept: it is the primary's sibling and the obvious manual pick
+  // during exactly the outage we just lived through.
+  "go/deepseek-v4-flash":  ["go/gpt-5.6-luna", "go/kimi-k2.7-code", "go/mimo-v2.5-pro"],
 }
 
 const RETRY_STATUSES = new Set([429, 500, 502, 503, 504])

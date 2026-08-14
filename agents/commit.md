@@ -1,9 +1,10 @@
 ---
 description: USA ESTO CUANDO haya que convertir cambios en commits — redactar el mensaje siguiendo conventional commits, agrupar cambios lógicos, o cuando el usuario diga "commitea esto", "haz el commit". Solo git, no escribe código. No: hacer push ni abrir PRs sin que se pida.
 mode: subagent
-model: opencode-go/glm-5.1
+model: opencode-go/gpt-5.6-luna
 temperature: 0
 permission:
+  external_directory: allow
   # tandem_* no aparece en el prompt si se deniega: -1743 tokens (medido)
   "tandem_*": deny
   edit: deny

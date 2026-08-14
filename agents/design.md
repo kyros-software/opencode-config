@@ -4,6 +4,7 @@ mode: subagent
 model: opencode-go/qwen3.8-max
 temperature: 0.8
 permission:
+  external_directory: allow
   "tandem_*": deny
   edit: allow
   bash:

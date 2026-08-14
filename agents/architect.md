@@ -4,6 +4,7 @@ mode: subagent
 model: opencode-go/kimi-k3
 temperature: 0.2
 permission:
+  external_directory: allow
   "tandem_*": deny
   edit: deny
   bash:

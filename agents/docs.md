@@ -3,6 +3,7 @@ description: USA ESTO CUANDO haya que escribir prosa para humanos — README, gu
 mode: subagent
 model: opencode-go/qwen3.7-plus
 permission:
+  external_directory: allow
   # tandem_* no aparece en el prompt si se deniega: -1743 tokens (medido)
   "tandem_*": deny
   edit: allow

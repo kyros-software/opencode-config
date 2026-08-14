@@ -1,9 +1,10 @@
 ---
 description: USA ESTO CUANDO haya que escribir o ejecutar tests — unitarios, integración, E2E — o cuando el usuario pida cobertura, "añade tests", "comprueba que esto funciona". Usa el framework que ya tenga el proyecto. No: diagnosticar un fallo en marcha (debug), verificar en navegador (web).
 mode: subagent
-model: opencode-go/gpt-5.6-luna
+model: opencode-go/deepseek-v4-pro
 temperature: 0
 permission:
+  external_directory: allow
   # tandem_* no aparece en el prompt si se deniega: -1743 tokens (medido)
   "tandem_*": deny
   edit: allow

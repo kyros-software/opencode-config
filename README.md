@@ -55,18 +55,41 @@ Every agent pins its own model, so one dead model breaks one agent, not the flee
 
 | Agent | Model | Temp |
 |---|---|---|
-| build (primary) | `gpt-5.6-luna` | 0 |
+| build (primary) | `deepseek-v4-pro` | 0 |
 | architect | `kimi-k3` | 0.2 |
 | design | `qwen3.8-max` | **0.8** |
 | plan | `kimi-k3` | 0.1 |
-| explore | `glm-5.1` | 0 |
-| test | `gpt-5.6-luna` | 0 |
+| explore | `gpt-5.6-luna` | 0 |
+| test | `deepseek-v4-pro` | 0 |
 | debug, reviewer | `kimi-k2.7-code` | 0 |
 | refactor, security, council | `kimi-k3` | 0 / 0.7 |
 | devops | `qwen3.6-plus` | 0 |
 | docs | `qwen3.7-plus` | default |
-| commit, fast, web | `glm-5.1` | 0 |
-| `small_model` | `glm-5.1` | — |
+| commit, fast, web | `gpt-5.6-luna` | 0 |
+| `small_model` | `gpt-5.6-luna` | — |
+
+### The cheap tier is `gpt-5.6-luna`, not glm-5.1
+
+`glm-5.1` used to hold `small_model`, `explore`, `commit`, `fast` and `web` — the
+whole cheap tier — and sat in 8 of the 9 fallback chains. Measured prices per
+million tokens say that was backwards:
+
+| | input | output | cache_read |
+|---|---|---|---|
+| `gpt-5.6-luna` | 0.10 | 0.60 | 0.01 |
+| `deepseek-v4-pro` | 0.435 | 0.87 | 0.003625 |
+| `kimi-k2.7-code` | 0.95 | 4.00 | 0.19 |
+| `glm-5.1` | **1.40** | **4.40** | **0.26** |
+
+glm-5.1 is strictly dominated — worse than `kimi-k2.7-code` on all three axes —
+and it was slower than both luna and deepseek on a measured task. It was the most
+expensive model on the account doing the work labelled "cheap and fast", and the
+failover target for almost every chain, so every outage funnelled traffic into it
+at the moment nobody was watching the bill. It is now pinned nowhere and appears
+in no chain; `bun test` enforces both.
+
+`explore` was the expensive half of that mistake: `AGENTS.md` routes every
+cross-file search there, so it is the highest-volume caller in the fleet.
 
 **Every model in that table needs an entry in `CHAINS`** (`fallback-proxy-lib.ts`).
 A model with no chain has no fallback, and the primary having no chain takes the
@@ -78,16 +101,38 @@ Verify they all resolve on a new machine:
 
 ```bash
 opencode models opencode-go
-for m in gpt-5.6-luna kimi-k3 kimi-k2.7-code glm-5.1 qwen3.6-plus qwen3.7-plus qwen3.8-max; do
+for m in deepseek-v4-pro kimi-k3 kimi-k2.7-code glm-5.1 qwen3.6-plus qwen3.7-plus qwen3.8-max; do
   printf '%-18s ' "$m"
   opencode run --model "opencode-go/$m" "say OK" 2>&1 | tail -1
 done
 ```
 
-Known dead as of Aug 2026: `deepseek-v4-pro` and `deepseek-v4-flash` (both
-China-region opt-in required — 403 `RegionError`), `kimi-k2.6`
-(`invalid_request`). Nothing chains to them; they keep chains of their own so a
-request for one routes away instead of failing.
+**Nothing is known dead right now.** `deepseek-v4-pro`, `deepseek-v4-flash` and
+`kimi-k2.6` all answered 200 on the last probe — the deepseek region gate that
+took out Aug 2026 has been lifted.
+
+Both deepseek models stay out of every chain's *candidate* list anyway. A
+fallback has to be more available than the thing it replaces, and these are the
+two models on the account with a history of disappearing for a month. Primary is
+fine — a chain covers the primary. Being somebody else's safety net is not.
+`bun test` enforces it.
+
+Note that the `opencode-go` and `opencode` tiers both carry a `deepseek-v4-pro`.
+They are different models: the Go one is displayed as **"DeepSeek V4 Pro (New)"**,
+the Zen one as plain "DeepSeek V4 Pro". This config pins the Go one everywhere.
+
+## Zen tier is disabled
+
+```json
+"disabled_providers": ["opencode"]
+```
+
+The Zen tier (Claude, GPT, Gemini) is switched off so the model picker only shows
+what this config actually uses. It also removes the whole class of accident where
+a `zen/…` model gets picked and lands on a tier with no chains behind it.
+
+To bring it back, drop the key — the fallback proxy still handles both tiers and
+needs no change either way.
 
 ## Fallback proxy
 
@@ -138,7 +183,7 @@ MCP earns its cost only for things with no CLI equivalent. If you add one:
 "permission": { "mcp_*": "ask" }
 ```
 
-## Two traps that cost hours to find
+## Three traps that cost hours to find
 
 Both make a non-interactive run hang until it times out, with no error and no
 session in the database. Neither is documented upstream.
@@ -163,6 +208,38 @@ opencode run "..." 2>&1 | tail -40 > out.log     # fine
 
 Pipe it; do not redirect it. Get the session id from the database instead:
 `select id from session order by time_created desc limit 1`.
+
+**3. Reading a file outside the project kills a non-interactive run.**
+
+```
+! permission requested: external_directory (~/.config/opencode/*); auto-rejecting
+✗ Read ~/.config/opencode/AGENTS.md failed
+Error: The user rejected permission to use this specific tool call.
+```
+
+Eight seconds, empty directory, exit 0. The agent reached for the global
+`AGENTS.md`, `external_directory` defaulted to a prompt, nobody was there to
+answer, and the rejection aborted the whole run instead of letting the agent
+carry on without that file. Found by a benchmark, not by a user — which is the
+point: interactively you just click yes and never learn it exists.
+
+Every agent that declares a `permission` block now carries
+`external_directory: allow`, because of trap 1: the block replaces, so an agent
+listing only `edit`/`bash` has no `external_directory` at all.
+
+Two things that do **not** work:
+
+```jsonc
+// Hangs. The glob does not match, so it falls through to "ask" — trap 2.
+"external_directory": { "**/.config/opencode/**": "allow" }
+
+// Also hangs, for the same reason, with any pattern that misses.
+```
+
+Only the bare `"allow"` was verified to work. It is also the honest setting:
+`build` already runs `bash: "allow"`, so it can `cat` any file on the machine.
+Restricting `external_directory` underneath an unrestricted shell protects
+nothing and only costs you runs.
 
 **Bonus, for measuring:** `sessionID` is a *column* (`session_id`) on `message`,
 not a field inside its JSON. And prompt size is `tokens.input + tokens.cache.read`

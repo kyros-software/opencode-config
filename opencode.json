@@ -1,8 +1,11 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "opencode-go/gpt-5.6-luna",
-  "small_model": "opencode-go/glm-5.1",
+  "model": "opencode-go/deepseek-v4-pro",
+  "small_model": "opencode-go/gpt-5.6-luna",
   "default_agent": "build",
+  "disabled_providers": [
+    "opencode"
+  ],
   "autoupdate": "notify",
   "snapshot": false,
   "share": "disabled",
@@ -44,12 +47,13 @@
   },
   "agent": {
     "build": {
-      "model": "opencode-go/gpt-5.6-luna",
+      "model": "opencode-go/deepseek-v4-pro",
       "mode": "primary",
       "temperature": 0,
       "permission": {
         "edit": "allow",
-        "bash": "allow"
+        "bash": "allow",
+        "external_directory": "allow"
       }
     },
     "plan": {
@@ -57,15 +61,17 @@
       "temperature": 0.1,
       "permission": {
         "edit": "deny",
-        "bash": "ask"
+        "bash": "ask",
+        "external_directory": "allow"
       }
     },
     "explore": {
-      "model": "opencode-go/glm-5.1",
+      "model": "opencode-go/gpt-5.6-luna",
       "temperature": 0,
       "description": "USA ESTO CUANDO haya que localizar algo en el repo y no sepas dónde está: dónde se usa un símbolo, qué ficheros tocan una feature, si existe ya algo parecido, o cuando la búsqueda cruce muchos ficheros o varias convenciones de nombres. Devuelve rutas y hallazgos, no volcados de ficheros. No: leer un fichero que ya sabes cuál es (hazlo tú), ni editar nada.",
       "permission": {
-        "tandem_*": "deny"
+        "tandem_*": "deny",
+        "external_directory": "allow"
       }
     },
     "general": {

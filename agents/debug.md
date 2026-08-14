@@ -4,6 +4,7 @@ mode: subagent
 model: opencode-go/kimi-k2.7-code
 temperature: 0
 permission:
+  external_directory: allow
   # tandem_* no aparece en el prompt si se deniega: -1743 tokens (medido)
   "tandem_*": deny
   edit: allow
