@@ -36,7 +36,17 @@ fi
 if [[ -d "$DEST" ]] && [[ -n "$(ls -A "$DEST" 2>/dev/null)" ]]; then
   BACKUP="$DEST.backup-$STAMP"
   say "Backing up existing config → $BACKUP"
-  run cp -a "$DEST" "$BACKUP"
+  # Everything except node_modules: it is 63 MB per backup, it is the only
+  # large thing in there, and `bun install` below rebuilds it from bun.lock.
+  # cp has no --exclude, and copying it to delete it afterwards still pays
+  # the I/O — so walk the entries instead.
+  run mkdir -p "$BACKUP"
+  shopt -s dotglob nullglob
+  for entry in "$DEST"/*; do
+    [[ "${entry##*/}" == "node_modules" ]] && continue
+    run cp -a "$entry" "$BACKUP/"
+  done
+  shopt -u dotglob nullglob
 else
   say "No existing config to back up"
 fi

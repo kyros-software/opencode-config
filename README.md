@@ -15,7 +15,8 @@ Private repo — the SSH key on the target machine must belong to an account wit
 access to the `kyros-software` org.
 
 Backs up any existing `~/.config/opencode` to `~/.config/opencode.backup-<timestamp>`
-before writing.
+before writing — everything but `node_modules`, which `bun install` rebuilds from
+`bun.lock`. That is 356 KB per backup instead of 63 MB.
 
 **Not included, by design:** credentials (`auth.json`) and session history.
 After installing, run `opencode auth login`.
