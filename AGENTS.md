@@ -53,7 +53,7 @@ window beats this one carrying accumulated noise.
 | Anything in the browser | `web` |
 | Locating something across the repo | `explore` |
 | One obvious edit in a file already identified | `fast` |
-| Pressure-testing a decision from several angles | `council` |
+| Pressure-testing a decision from several angles | `council`, N seats in parallel — never one |
 
 Do **not** delegate: a small edit in a file already open here, or anything
 needing back-and-forth with the user. A subagent starts cold and re-reads what
@@ -65,6 +65,7 @@ Subagents cannot delegate further, so orchestrate multiple specialists yourself.
 Check the available skills before improvising. Invoking one costs a read; not
 invoking it costs doing the job worse.
 
+- `llm-council` — before pressure-testing a decision; it seats the panel
 - `tandem` — before driving the browser with `tandem_*`
 - `verification-loop` — before claiming anything is done
 - `security-review` — when touching auth, user input, secrets, or endpoints

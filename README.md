@@ -27,7 +27,7 @@ After installing, run `opencode auth login`.
 | `opencode.json` | Main config: models, compaction, tool output caps, watcher ignores, provider timeouts |
 | `AGENTS.md` | Global rules, loaded into every request. **Keep byte-stable** — see below |
 | `agents/` | 13 subagents (plus build/plan/explore in the config), each pinned to a model chosen for its job |
-| `skills/` | 9 on-demand skills |
+| `skills/` | 10 on-demand skills |
 | `plugins/` | `tandem.ts` (browser control), `fallback-proxy.ts` |
 | `test/` | Test suite for the fallback proxy (`bun test`) |
 
@@ -202,7 +202,7 @@ MCP earns its cost only for things with no CLI equivalent. If you add one:
 "permission": { "mcp_*": "ask" }
 ```
 
-## Four traps that cost hours to find
+## Five traps that cost hours to find
 
 Both make a non-interactive run hang until it times out, with no error and no
 session in the database. Neither is documented upstream.
@@ -285,6 +285,23 @@ test delegates, so the collision is invisible until real work hits it. Note the
 guard is about *collision with whatever `model` is set to*, not about any
 particular model — change the primary and a previously fine subagent becomes the
 broken one.
+
+**5. An agent named after a group is one seat of it, and nobody seats the rest.**
+
+`council` was written as a single advisor holding a single lens — correct, and
+useless on its own. Nothing in the config convened the panel, so "council this"
+delegated **once** and came back with one cheap model's opinion wearing the
+authority of an arbitrated verdict. The failure is silent: the output looks
+exactly like a council output.
+
+Subagents cannot delegate, so a seat can never convene its peers — the panel has
+to be orchestrated by the primary. That protocol now lives in the `llm-council`
+skill (parallel seats → anonymised peer review → synthesis here), the delegation
+table says *N seats in parallel, never one*, and the agent's own description
+leads with it, so a single call is wrong at every layer that could produce it.
+
+Generalises past this one agent: if a subagent's name implies plurality, check
+what actually spawns the plurality.
 
 **Bonus, for measuring:** `sessionID` is a *column* (`session_id`) on `message`,
 not a field inside its JSON. And prompt size is `tokens.input + tokens.cache.read`
