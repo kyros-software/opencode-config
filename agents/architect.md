@@ -1,6 +1,6 @@
 ---
 description: USA ESTO CUANDO haya que decidir la forma de algo antes de escribirlo — qué ficheros y módulos hacen falta, cómo se reparten las responsabilidades, qué contratos hay entre piezas, o cuando el usuario diga "cómo lo montarías", "qué estructura", "planifica", "por dónde empiezo". También para juzgar si un diseño existente aguanta un cambio grande. No: escribir el código (build), reestructurar lo que ya funciona (refactor), cómo se ve (design).
-mode: subagent
+mode: all
 model: opencode-go/kimi-k3
 temperature: 0.2
 permission:

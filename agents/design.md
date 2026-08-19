@@ -1,6 +1,6 @@
 ---
 description: USA ESTO CUANDO haya que decidir cómo se ve o se siente algo — maquetar una pantalla nueva, elegir tipografía, espaciado, jerarquía visual, paleta, estados de un componente, responsive, o cuando el usuario diga que algo "queda feo", "soso", "genérico" o "no se entiende". También para revisar una UI existente y decir qué falla visualmente. No: lógica de negocio (build), verificar en navegador (web), prosa (docs).
-mode: subagent
+mode: all
 model: opencode-go/qwen3.8-max
 temperature: 0.8
 permission:

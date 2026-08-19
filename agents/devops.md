@@ -1,6 +1,6 @@
 ---
 description: USA ESTO CUANDO el trabajo NO sea código de la aplicación — Dockerfile, docker-compose, CI/CD, GitHub Actions, scripts de shell, variables de entorno, despliegue, o "esto me falla solo en mi máquina". No: lógica de negocio (build), tests de la app (test).
-mode: subagent
+mode: all
 model: opencode-go/qwen3.6-plus
 temperature: 0
 permission:

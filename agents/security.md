@@ -1,6 +1,6 @@
 ---
 description: USA ESTO CUANDO haya que auditar seguridad — inyección SQL, XSS, CSRF, SSRF, secrets expuestos, autenticación y autorización, dependencias vulnerables, configuración insegura. También al tocar login, pagos, subida de ficheros o endpoints públicos. Solo lee. No: calidad general del código (reviewer).
-mode: subagent
+mode: all
 model: opencode-go/kimi-k2.7-code
 temperature: 0
 permission:

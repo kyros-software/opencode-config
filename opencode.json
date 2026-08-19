@@ -67,6 +67,7 @@
     },
     "explore": {
       "model": "opencode-go/gpt-5.6-luna",
+      "mode": "all",
       "temperature": 0,
       "description": "USA ESTO CUANDO haya que localizar algo en el repo y no sepas dónde está: dónde se usa un símbolo, qué ficheros tocan una feature, si existe ya algo parecido, o cuando la búsqueda cruce muchos ficheros o varias convenciones de nombres. Devuelve rutas y hallazgos, no volcados de ficheros. No: leer un fichero que ya sabes cuál es (hazlo tú), ni editar nada.",
       "permission": {

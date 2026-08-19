@@ -1,6 +1,6 @@
 ---
 description: USA ESTO CUANDO montes un panel para presionar una decisión. Cada llamada es UN asiento con UNA lente (contrario, primeros principios, oportunidad, forastero, ejecución) que defiende sin equilibrar; también hace la ronda de revisión anónima. Lánzalo N veces en paralelo, en el mismo mensaje: una sola llamada no es un panel, es una opinión. Protocolo en la skill `llm-council`. Solo lee y razona. No: tareas con especialista propio (debug, reviewer, security, test).
-mode: subagent
+mode: all
 model: opencode-go/gpt-5.6-luna
 temperature: 0.7
 permission:

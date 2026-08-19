@@ -203,7 +203,75 @@ MCP earns its cost only for things with no CLI equivalent. If you add one:
 "permission": { "mcp_*": "ask" }
 ```
 
-## Five traps that cost hours to find
+## Driving this fleet from Claude Code
+
+`mcp/opencode-mcp.ts` is the other direction: an MCP server that exposes this
+fleet **to** Claude Code, so expensive-model work can be handed down to it.
+
+```bash
+claude mcp add opencode -s user -- "$(which bun)" ~/opencode-config/mcp/opencode-mcp.ts
+claude mcp list        # opencode - ✔ Connected
+```
+
+Two tools. `run` takes a prompt and optionally an agent, model, dir, session or
+timeout; `agents` lists the fleet off disk so the caller picks a real specialist
+instead of guessing a name.
+
+**This breaks the rule directly above, on purpose.** Claude Code can already
+call `opencode run` from bash, so by that rule the server is redundant. What
+bash cannot do is come back cheap: a raw run prints its entire tool trace, and
+the reason to delegate to a cheap model is to *not* pay for that trace in the
+expensive model's window. `run` returns the final text and one accounting line —
+session, seconds, cost, prompt/output tokens, tool counts — and drops the rest.
+Two tools, not forty. If that stops being worth ~600 tokens of schema,
+`claude mcp remove opencode` is the whole rollback.
+
+The second reason is a trap found while building it, and it is worse than a
+typo. **`opencode run --agent` only starts primary agents.** A name that exists
+in the fleet but has `mode: subagent` does not fail — OpenCode warns on stderr
+("agent X is a subagent, not a primary agent. Falling back to default agent")
+and runs `default_agent`, which here is `build`: `edit: allow`, `bash: allow`.
+The 13 agents in `agents/*.md` all had `mode: subagent`, and `explore` declared
+no mode (which defaults to subagent). Measured result: asking for `security`,
+`fast`, or `explore` returned `agent=build model=deepseek-v4-pro` in all three
+cases, verified in the OpenCode database, not from what the model claimed.
+
+This inverts both arguments for the bridge. Security: you asked for a read-only
+specialist and got the write-enabled primary, with nothing saying so. Cost: the
+reason to delegate is to pay less; asking for `fast` (gpt-5.6-luna) and getting
+deepseek-v4-pro meant delegating cost more than not delegating.
+
+The fix: the 13 `agents/*.md` now have `mode: all`, and `explore` receives
+`"mode": "all"` in `opencode.json`. `all` means reachable as primary
+(`run --agent`) and as subagent (`task` from inside OpenCode). As a side
+effect, they now also appear in the TUI's primary selector. The server refuses
+before spawning if the requested agent is not primary, and the error lists
+which ones are. After the run, if stderr contains the fallback warning, it
+returns failed and marks the output as untrusted. This is defense in depth and
+is deliberately fragile: the `--format json` stream carries no field with the
+agent or model, so stderr is the only in-band signal that exists.
+
+`test/agent-routing.test.ts` asserts that every agent declares `mode: primary`
+or `all`. It is an assertion about config on disk: no model, no network.
+
+One suspicion verified and discarded: resuming a session with `--session` while
+also passing `--agent X` does change the agent. `--agent` wins. There is no
+bypass through there.
+
+Defaults chosen for the same reason: `run` uses `plan` (edit denied) unless an
+agent is named, and it passes `--auto`, which approves whatever an agent's
+permission block does not explicitly *deny* — without it any `ask` kills a
+non-interactive run outright (trap 3). `--auto` cannot widen a `deny`, so
+`plan` stays read-only through the tool; `bash` is still `ask`-then-approved
+there, so a determined run could write through the shell. Treat `plan` as "will
+not edit", not as a sandbox. `plan` is a real primary — built into OpenCode —
+and therefore was the only path that never fell to the default.
+
+It is not installed by `install.sh`: that installs OpenCode's config, and this
+is a Claude Code artifact that happens to live in the same repo because it is
+useless without the fleet it points at.
+
+## Six traps that cost hours to find
 
 Both make a non-interactive run hang until it times out, with no error and no
 session in the database. Neither is documented upstream.
@@ -303,6 +371,19 @@ leads with it, so a single call is wrong at every layer that could produce it.
 
 Generalises past this one agent: if a subagent's name implies plurality, check
 what actually spawns the plurality.
+
+**6. A subagent is not a primary, and OpenCode does not fail when you try.**
+
+`opencode run --agent` only starts primary agents. A name in the fleet with
+`mode: subagent` does not error — it warns on stderr and runs `default_agent`
+instead. Measured: asking for `security`, `fast`, or `explore` (all subagents)
+returned `agent=build model=deepseek-v4-pro`. This inverts both arguments for
+delegating: you asked for a read-only specialist and got the write-enabled
+primary; you asked for `fast` (gpt-5.6-luna) and paid for deepseek-v4-pro.
+
+Agents now have `mode: all` (reachable as primary and subagent). The MCP server
+refuses non-primaries before spawning and checks stderr after the run. `bun test`
+enforces `mode: primary` or `all` on every agent.
 
 **Bonus, for measuring:** `sessionID` is a *column* (`session_id`) on `message`,
 not a field inside its JSON. And prompt size is `tokens.input + tokens.cache.read`

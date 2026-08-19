@@ -1,6 +1,6 @@
 ---
 description: USA ESTO CUANDO el código YA funciona y hay que dejarlo mejor sin cambiar su comportamiento — extraer, renombrar, simplificar, partir un fichero enorme, quitar duplicación. También si el usuario dice "esto está muy liado", "límpialo", "quita deuda". Aplica los cambios y corre los tests. No: arreglar bugs (debug), solo opinar (reviewer).
-mode: subagent
+mode: all
 model: opencode-go/kimi-k2.7-code
 temperature: 0
 permission:
