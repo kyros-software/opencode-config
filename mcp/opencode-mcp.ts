@@ -12,12 +12,15 @@
 // methods. This repo has one dependency; adding an SDK to speak four methods is
 // not a trade worth making.
 
+import { Database } from "bun:sqlite"
+
 const NAME = "opencode"
 const VERSION = "0.1.0"
 const FALLBACK_PROTOCOL = "2025-06-18"
 const CONFIG_DIR = process.env.OPENCODE_CONFIG_DIR ?? `${process.env.HOME}/.config/opencode`
 const DEFAULT_TIMEOUT_S = 240
 const BUILTIN_PRIMARY = new Set(["build", "plan"])
+const DB_PATH = `${process.env.XDG_DATA_HOME ?? `${process.env.HOME}/.local/share`}/opencode/opencode.db`
 
 // ---------------------------------------------------------------- run
 
@@ -31,6 +34,70 @@ type RunArgs = {
 }
 
 type Digest = { text: string; footer: string; failed: boolean }
+
+// What actually ran, straight from OpenCode's own database.
+//
+// Necessary because the `--format json` stream names neither the agent nor the
+// model — its events carry only `type`, `part`, `sessionID` and `timestamp` —
+// so the only other in-band signal was OpenCode's stderr warning, and matching
+// on the wording of a warning breaks the day upstream rephrases it. This row is
+// the same thing the TUI displays.
+function readRun(session: string): { agent?: string; model?: string } {
+  const db = new Database(DB_PATH, { readonly: true })
+  try {
+    // Newest first, then the first assistant row: a resumed session holds every
+    // earlier turn too, and the one that matters is this run's. `id` breaks ties
+    // when two rows share a millisecond.
+    const rows = db.query("SELECT data FROM message WHERE session_id = ? ORDER BY time_created DESC, id DESC LIMIT 20").all(session) as { data: string }[]
+    for (const r of rows) {
+      let m: any
+      // Per row: one unparseable row must not hide the good rows behind it.
+      try {
+        m = JSON.parse(r.data)
+      } catch {
+        continue
+      }
+      if (m?.role === "assistant" && typeof m.agent === "string" && m.agent) {
+        return { agent: m.agent, model: typeof m.modelID === "string" ? m.modelID : undefined }
+      }
+    }
+  } finally {
+    db.close()
+  }
+  return {}
+}
+
+// What actually ran, straight from OpenCode's own database.
+//
+// Necessary because the `--format json` stream names neither the agent nor the
+// model — its events carry only `type`, `part`, `sessionID` and `timestamp` —
+// so the only other in-band signal was OpenCode's stderr warning, and matching
+// on the wording of a warning breaks the day upstream rephrases it. This row is
+// the same thing the TUI displays.
+//
+// Retries because a read that comes back empty is indistinguishable from "ran
+// as asked", and that is the one wrong answer this check must never give. The
+// row is written during the run, so the first attempt nearly always has it; the
+// rest cover a commit landing after the process exits.
+async function actualRun(session: string): Promise<{ agent?: string; model?: string }> {
+  if (!session) return {}
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const found = readRun(session)
+      if (found.agent) return found
+    } catch (e: any) {
+      // A readonly connection to a WAL database still needs its `-shm`; that,
+      // a schema change upstream, or a locked file all land here. Say so on
+      // stderr — stdout is the JSON-RPC channel and cannot carry diagnostics —
+      // and let the stderr fallback check downstream do the work.
+      process.stderr.write(`opencode-mcp: could not read ${DB_PATH}: ${e?.message ?? e}\n`)
+      return {}
+    }
+    if (attempt < 2) await Bun.sleep(75)
+  }
+  process.stderr.write(`opencode-mcp: no assistant row for session ${session}; falling back to the stderr check\n`)
+  return {}
+}
 
 async function runOpencode(a: RunArgs): Promise<Digest> {
   if (!a.prompt?.trim()) throw new Error("prompt is required")
@@ -123,17 +190,25 @@ async function runOpencode(a: RunArgs): Promise<Digest> {
   const toolLine = tools.size ? ` · ${[...tools].map(([t, n]) => `${t}×${n}`).join(" ")}` : ""
   // Prompt size is input + cache.read: reading `input` alone compares runs with
   // different cache states and reports nonsense.
-  const footer = `— ${session || "no session"} · ${secs}s · $${cost.toFixed(4)} · prompt ${tin + cache} · out ${tout}${toolLine}`
+  const ran = await actualRun(session)
+  const ranLine = ran.agent ? ` · ran as ${ran.agent}${ran.model ? `/${ran.model}` : ""}` : ""
+  const footer = `— ${session || "no session"} · ${secs}s · $${cost.toFixed(4)} · prompt ${tin + cache} · out ${tout}${toolLine}${ranLine}`
 
-  // The check above is a guess made from config on disk; this is the ground
-  // truth. OpenCode does not fail when it refuses an agent — it warns on stderr
-  // and runs `default_agent` instead, which here is `build`: edit allow, bash
-  // allow. The answer that comes back looks perfectly fine, so swallowing this
-  // line means a request for a read-only specialist silently returns the
-  // write-enabled primary, at the primary's price.
-  const fellBack = /is a subagent, not a primary agent/.test(err)
+  // OpenCode does not fail when it refuses an agent: it warns on stderr and runs
+  // `default_agent` instead, which here is `build` — edit allow, bash allow. The
+  // answer comes back looking perfectly fine, so an unchecked run silently
+  // returns the write-enabled primary, at the primary's price, for a request
+  // that named a read-only specialist.
+  //
+  // Compare names rather than reading the warning: the database says what ran,
+  // and it keeps saying it whatever upstream does to the wording. The stderr
+  // match stays behind it for the case where the database cannot be read.
+  const misrouted = ran.agent !== undefined && ran.agent !== agent
+  const fellBack = misrouted || /is a subagent, not a primary agent/.test(err)
   const fallbackNote = fellBack
-    ? `opencode refused agent "${agent}" and fell back to the default agent, so this did NOT run as asked — treat the output below as untrusted.\n\n`
+    ? `opencode did NOT run this as the requested agent "${agent}"` +
+      (ran.agent ? ` — it ran as "${ran.agent}"${ran.model ? ` on ${ran.model}` : ""}` : ", it fell back to the default agent") +
+      `. Permissions and cost are not what was asked for, so treat the output below as untrusted.\n\n`
     : ""
 
   if (timedOut) {
@@ -149,7 +224,8 @@ async function runOpencode(a: RunArgs): Promise<Digest> {
   }
 
   if (fellBack) {
-    return { text: `${fallbackNote}stderr: ${err.replace(/\x1b\[[0-9;]*m/g, "").trim()}\n\n${text}`, footer, failed: true }
+    const detail = misrouted ? "" : `stderr: ${err.replace(/\x1b\[[0-9;]*m/g, "").trim()}\n\n`
+    return { text: `${fallbackNote}${detail}${text}`, footer, failed: true }
   }
   if (code !== 0 && !text) {
     return { text: `opencode exited ${code}\n${err.trim().slice(-2000)}`, footer, failed: true }

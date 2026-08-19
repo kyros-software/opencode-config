@@ -246,10 +246,19 @@ The fix: the 13 `agents/*.md` now have `mode: all`, and `explore` receives
 (`run --agent`) and as subagent (`task` from inside OpenCode). As a side
 effect, they now also appear in the TUI's primary selector. The server refuses
 before spawning if the requested agent is not primary, and the error lists
-which ones are. After the run, if stderr contains the fallback warning, it
-returns failed and marks the output as untrusted. This is defense in depth and
-is deliberately fragile: the `--format json` stream carries no field with the
-agent or model, so stderr is the only in-band signal that exists.
+which ones are.
+
+After the run it checks what actually ran, and not by reading OpenCode's warning
+text. The `--format json` stream names neither the agent nor the model — its
+events carry only `type`, `part`, `sessionID` and `timestamp` — but the session
+is already in `opencode.db`, where the newest `assistant` row in `message`
+carries `agent` and `modelID`. Comparing that name against the requested one
+catches a misroute whatever upstream does to the wording, and it catches
+misroutes that never warn at all. The name that actually ran is now on the
+accounting line as `ran as <agent>/<model>`, so a delegation reports what it
+was, not what it was asked to be. The stderr match stays behind it for the case
+where the database cannot be read; a read that comes back empty retries twice
+before giving up, because an empty read and "ran as asked" must not look alike.
 
 `test/agent-routing.test.ts` asserts that every agent declares `mode: primary`
 or `all`. It is an assertion about config on disk: no model, no network.
