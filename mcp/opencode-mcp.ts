@@ -181,15 +181,17 @@ async function runOpencode(a: RunArgs): Promise<Digest> {
       cost += p.cost ?? 0
       tin += p.tokens?.input ?? 0
       tout += p.tokens?.output ?? 0
-      cache += p.tokens?.cache?.read ?? 0
+      cache += (p.tokens?.cache?.read ?? 0) + (p.tokens?.cache?.write ?? 0)
     }
   }
 
   const text = [...texts.values()].join("\n").trim()
   const secs = ((Date.now() - started) / 1000).toFixed(1)
   const toolLine = tools.size ? ` · ${[...tools].map(([t, n]) => `${t}×${n}`).join(" ")}` : ""
-  // Prompt size is input + cache.read: reading `input` alone compares runs with
-  // different cache states and reports nonsense.
+  // Prompt size is input + cache.read + cache.write. `input` alone compares runs
+  // in different cache states and reports nonsense, but so does input + read:
+  // on the first run against a prefix the whole prompt lands in cache.write and
+  // read is zero, so a real 8348-token prompt was reporting as 3.
   const ran = await actualRun(session)
   const ranLine = ran.agent ? ` · ran as ${ran.agent}${ran.model ? `/${ran.model}` : ""}` : ""
   const footer = `— ${session || "no session"} · ${secs}s · $${cost.toFixed(4)} · prompt ${tin + cache} · out ${tout}${toolLine}${ranLine}`

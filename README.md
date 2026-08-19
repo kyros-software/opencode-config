@@ -395,9 +395,13 @@ refuses non-primaries before spawning and checks stderr after the run. `bun test
 enforces `mode: primary` or `all` on every agent.
 
 **Bonus, for measuring:** `sessionID` is a *column* (`session_id`) on `message`,
-not a field inside its JSON. And prompt size is `tokens.input + tokens.cache.read`
-— reading `input` alone compares runs with different cache states and gives
-nonsense.
+not a field inside its JSON. And prompt size is `tokens.input` plus **both**
+cache counters. `input` alone compares runs in different cache states and gives
+nonsense — but so does `input + cache.read`, which is the half-fix: the first
+run against a given prefix writes it, so the entire prompt lands in
+`cache.write` and `read` is zero. A measured run reported `input: 3,
+cache.write: 8345` for an 8348-token prompt. `total - output - reasoning` is the
+same number and is harder to get wrong.
 
 ## Maintenance
 
