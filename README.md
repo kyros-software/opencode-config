@@ -8,8 +8,13 @@ Kimi, Qwen) with a per-task subagent fleet.
 ```bash
 git clone git@github.com:kyros-software/opencode-config.git ~/opencode-config
 cd ~/opencode-config
-./install.sh            # --dry-run to preview
+./install.sh            # --dry-run to preview; --no-mcp to skip the bridge
 ```
+
+Needs `bun` on PATH. OpenCode's own plugins will fall back to `npm`, but the
+Claude Code bridge imports `bun:sqlite` and runs under nothing else — without
+bun you get a working fleet and a bridge that never connects, so the script
+warns about it before it copies anything.
 
 Private repo — the SSH key on the target machine must belong to an account with
 access to the `kyros-software` org.
@@ -208,8 +213,13 @@ MCP earns its cost only for things with no CLI equivalent. If you add one:
 `mcp/opencode-mcp.ts` is the other direction: an MCP server that exposes this
 fleet **to** Claude Code, so expensive-model work can be handed down to it.
 
+`install.sh` registers it, and re-points it if the clone has moved — it compares
+the registered path, not just the name, because a stale absolute path still
+answers to `opencode` and a name-only check calls that success. To do it by
+hand, or on a machine where Claude Code was not on PATH at install time:
+
 ```bash
-claude mcp add opencode -s user -- "$(which bun)" ~/opencode-config/mcp/opencode-mcp.ts
+claude mcp add opencode -s user -- "$(which bun)" "$PWD/mcp/opencode-mcp.ts"
 claude mcp list        # opencode - ✔ Connected
 ```
 
@@ -276,9 +286,11 @@ there, so a determined run could write through the shell. Treat `plan` as "will
 not edit", not as a sandbox. `plan` is a real primary — built into OpenCode —
 and therefore was the only path that never fell to the default.
 
-It is not installed by `install.sh`: that installs OpenCode's config, and this
-is a Claude Code artifact that happens to live in the same repo because it is
-useless without the fleet it points at.
+`install.sh` registers it with Claude Code but never copies it into
+`~/.config/opencode`. It is a Claude Code artifact that happens to live in this
+repo because it is useless without the fleet it points at, and a second copy
+under the config dir would be the one nobody runs and everybody edits. The
+registration is by absolute path, so the clone has to stay where it is.
 
 ## Six traps that cost hours to find
 
